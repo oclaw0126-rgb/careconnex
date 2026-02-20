@@ -19,13 +19,13 @@ export async function executeTool(
 
   switch (toolCall.tool) {
     case 'search_caregivers':
-      return await toolSearchCaregivers(toolCall.parameters, context);
+      return await toolSearchCaregivers(toolCall.parameters as { zip_code: string; care_type?: string }, context);
     case 'schedule_interview':
-      return await toolScheduleInterview(toolCall.parameters, context);
+      return await toolScheduleInterview(toolCall.parameters as { caregiver_id: string; caregiver_name: string; proposed_time: string }, context);
     case 'store_memory':
-      return await toolStoreMemory(toolCall.parameters, context);
+      return await toolStoreMemory(toolCall.parameters as { key: string; value: string }, context);
     case 'request_human':
-      return await toolRequestHuman(toolCall.parameters, context);
+      return await toolRequestHuman(toolCall.parameters as { reason: string }, context);
     default:
       throw new Error(`Unknown tool: ${toolCall.tool}`);
   }
