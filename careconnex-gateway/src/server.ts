@@ -8,6 +8,8 @@ import { runAgent } from './agent';
 import { initializeTools } from './tools';
 import { getSessionStats } from './session';
 import { spawnSubAgent, runOvernightJobs } from './subagents';
+import { analyzeSeniorHealth, runHealthAnalysisForAllSeniors, sendDailyHealthSummary } from './healthPredictor';
+import { getSmartMatches, calculateSmartMatchScore, collectFamilyFeedback, learnFromMatches, runWeeklyLearning } from './matchingLearner';
 
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
@@ -205,6 +207,178 @@ app.get('/agents/task/:taskId', async (req, res) => {
   } catch (error) {
     logger.error('[API] Get task error', { error });
     res.status(500).json({ error: 'Failed to get task status' });
+  }
+});
+
+// ========== PREDICTIVE HEALTH ALERTS ==========
+
+// Analyze a senior's health data
+app.post('/health/analyze', async (req, res) => {
+  try {
+    const { seniorId } = req.body;
+    
+    if (!seniorId) {
+      res.status(400).json({ error: 'Missing seniorId' });
+      return;
+    }
+    
+    const alerts = await analyzeSeniorHealth(seniorId);
+    
+    res.json({
+      success: true,
+      seniorId,
+      alerts,
+      alertCount: alerts.length,
+      criticalCount: alerts.filter(a => a.severity === 'critical').length
+    });
+  } catch (error) {
+    logger.error('[API] Health analysis error', { error });
+    res.status(500).json({ error: 'Failed to analyze health data' });
+  }
+});
+
+// Run health analysis for all seniors (cron endpoint)
+app.post('/health/analyze-all', async (req, res) => {
+  try {
+    // Run in background
+    runHealthAnalysisForAllSeniors();
+    
+    res.json({
+      success: true,
+      message: 'Health analysis started for all seniors',
+      status: 'running'
+    });
+  } catch (error) {
+    logger.error('[API] Health analysis all error', { error });
+    res.status(500).json({ error: 'Failed to start analysis' });
+  }
+});
+
+// Send daily health summary to family
+app.post('/health/send-summary', async (req, res) => {
+  try {
+    const { seniorId } = req.body;
+    
+    if (!seniorId) {
+      res.status(400).json({ error: 'Missing seniorId' });
+      return;
+    }
+    
+    await sendDailyHealthSummary(seniorId);
+    
+    res.json({
+      success: true,
+      message: 'Health summary sent to family'
+    });
+  } catch (error) {
+    logger.error('[API] Send summary error', { error });
+    res.status(500).json({ error: 'Failed to send summary' });
+  }
+});
+
+// ========== SELF-IMPROVING MATCHING ==========
+
+// Get smart caregiver matches for a senior
+app.get('/matching/smart/:seniorId', async (req, res) => {
+  try {
+    const { seniorId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 3;
+    
+    const matches = await getSmartMatches(seniorId, limit);
+    
+    res.json({
+      success: true,
+      seniorId,
+      matches,
+      count: matches.length
+    });
+  } catch (error) {
+    logger.error('[API] Smart matching error', { error });
+    res.status(500).json({ error: 'Failed to get smart matches' });
+  }
+});
+
+// Calculate match score between senior and caregiver
+app.get('/matching/score', async (req, res) => {
+  try {
+    const { seniorId, caregiverId } = req.query;
+    
+    if (!seniorId || !caregiverId) {
+      res.status(400).json({ error: 'Missing seniorId or caregiverId' });
+      return;
+    }
+    
+    const result = await calculateSmartMatchScore(seniorId as string, caregiverId as string);
+    
+    res.json({
+      success: true,
+      seniorId,
+      caregiverId,
+      ...result
+    });
+  } catch (error) {
+    logger.error('[API] Match score error', { error });
+    res.status(500).json({ error: 'Failed to calculate match score' });
+  }
+});
+
+// Collect family feedback on a match
+app.post('/matching/feedback', async (req, res) => {
+  try {
+    const { seniorId, caregiverId, rating, satisfaction, wouldRecommend, comments } = req.body;
+    
+    if (!seniorId || !caregiverId) {
+      res.status(400).json({ error: 'Missing seniorId or caregiverId' });
+      return;
+    }
+    
+    await collectFamilyFeedback(seniorId, caregiverId, {
+      rating,
+      satisfaction,
+      wouldRecommend,
+      comments
+    });
+    
+    res.json({
+      success: true,
+      message: 'Feedback collected successfully'
+    });
+  } catch (error) {
+    logger.error('[API] Feedback error', { error });
+    res.status(500).json({ error: 'Failed to collect feedback' });
+  }
+});
+
+// Trigger learning from matches (cron endpoint)
+app.post('/matching/learn', async (req, res) => {
+  try {
+    // Run in background
+    learnFromMatches();
+    
+    res.json({
+      success: true,
+      message: 'Learning cycle started',
+      status: 'running'
+    });
+  } catch (error) {
+    logger.error('[API] Learn error', { error });
+    res.status(500).json({ error: 'Failed to start learning' });
+  }
+});
+
+// Run weekly learning cycle
+app.post('/matching/weekly-learning', async (req, res) => {
+  try {
+    runWeeklyLearning();
+    
+    res.json({
+      success: true,
+      message: 'Weekly learning cycle started',
+      status: 'running'
+    });
+  } catch (error) {
+    logger.error('[API] Weekly learning error', { error });
+    res.status(500).json({ error: 'Failed to start weekly learning' });
   }
 });
 
