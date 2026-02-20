@@ -7,6 +7,7 @@ import { logger } from './logger';
 import { runAgent } from './agent';
 import { initializeTools } from './tools';
 import { getSessionStats } from './session';
+import { spawnSubAgent, runOvernightJobs } from './subagents';
 
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
@@ -117,6 +118,94 @@ app.get('/stats', (req, res) => {
     timestamp: new Date().toISOString(),
     sessions: stats
   });
+});
+
+// Sub-Agent Endpoints
+
+// Spawn a specialized sub-agent
+app.post('/agents/spawn', async (req, res) => {
+  try {
+    const { type, familyId, seniorId, instructions } = req.body;
+    
+    if (!type || !familyId || !seniorId) {
+      res.status(400).json({ error: 'Missing required fields: type, familyId, seniorId' });
+      return;
+    }
+    
+    const taskId = await spawnSubAgent(type, familyId, seniorId, instructions || '');
+    
+    res.json({
+      success: true,
+      taskId,
+      message: `Spawned ${type} agent for family ${familyId}`,
+      status: 'running'
+    });
+  } catch (error) {
+    logger.error('[API] Spawn agent error', { error });
+    res.status(500).json({ error: 'Failed to spawn agent' });
+  }
+});
+
+// Trigger overnight jobs (cron endpoint)
+app.post('/agents/overnight', async (req, res) => {
+  try {
+    // Run in background
+    runOvernightJobs();
+    
+    res.json({
+      success: true,
+      message: 'Overnight jobs started',
+      status: 'running'
+    });
+  } catch (error) {
+    logger.error('[API] Overnight jobs error', { error });
+    res.status(500).json({ error: 'Failed to start overnight jobs' });
+  }
+});
+
+// Send care update to family (manual trigger)
+app.post('/agents/send-update', async (req, res) => {
+  try {
+    const { familyId, seniorId, type = 'daily' } = req.body;
+    
+    if (!familyId || !seniorId) {
+      res.status(400).json({ error: 'Missing familyId or seniorId' });
+      return;
+    }
+    
+    const taskId = await spawnSubAgent('reporter', familyId, seniorId, `Generate ${type} care report`);
+    
+    res.json({
+      success: true,
+      taskId,
+      message: `Care update being sent to family ${familyId}`,
+      type
+    });
+  } catch (error) {
+    logger.error('[API] Send update error', { error });
+    res.status(500).json({ error: 'Failed to send update' });
+  }
+});
+
+// Get sub-agent task status
+app.get('/agents/task/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const taskDoc = await db.collection('subagent_tasks').doc(taskId).get();
+    
+    if (!taskDoc.exists) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    
+    res.json({
+      taskId,
+      ...taskDoc.data()
+    });
+  } catch (error) {
+    logger.error('[API] Get task error', { error });
+    res.status(500).json({ error: 'Failed to get task status' });
+  }
 });
 
 // XML escape helper
