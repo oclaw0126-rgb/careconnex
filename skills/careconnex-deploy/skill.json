@@ -1,0 +1,23 @@
+{
+  "name": "careconnex-deploy",
+  "version": "1.0.0",
+  "description": "One-command deployment for CareConnex frontend and Firebase Cloud Functions",
+  "author": "Jarvis (self-evolved)",
+  "keywords": ["careconnex", "deploy", "firebase", "automation"],
+  "actions": {
+    "deploy": {
+      "description": "Deploy CareConnex frontend and/or functions",
+      "params": {
+        "target": {
+          "type": "string",
+          "enum": ["all", "frontend", "functions"],
+          "default": "all"
+        },
+        "verbose": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

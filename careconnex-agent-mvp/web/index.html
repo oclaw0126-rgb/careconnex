@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareConnex Agent - Find Care via Text</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 480px;
+      width: 100%;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #0d9488, #0891b2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+    }
+    
+    .logo-text {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+    
+    .subtitle {
+      color: #64748b;
+      font-size: 18px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    
+    .highlight {
+      color: #0d9488;
+      font-weight: 600;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: border-color 0.2s;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #0d9488;
+    }
+    
+    .phone-input {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .phone-input select {
+      width: 100px;
+      flex-shrink: 0;
+    }
+    
+    button {
+      width: 100%;
+      padding: 18px;
+      background: linear-gradient(135deg, #0d9488, #0891b2);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -10px rgba(13, 148, 136, 0.5);
+    }
+    
+    .features {
+      margin-top: 32px;
+      padding-top: 32px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-icon {
+      width: 24px;
+      height: 24px;
+      background: #d1fae5;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #059669;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    
+    .feature-text {
+      color: #475569;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    
+    .demo-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    
+    .success-message {
+      display: none;
+      background: #d1fae5;
+      color: #065f46;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .success-message.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <span class="demo-badge">🚧 MVP Demo Version</span>
+      
+      <div class="logo">
+        <div class="logo-icon">💚</div>
+        <div class="logo-text">CareConnex</div>
+      </div>
+      
+      <h1>Find care via text message</h1>
+      <p class="subtitle">
+        Tell our AI agent what you need, and we'll find the perfect caregiver for your loved one. 
+        <span class="highlight">No apps to download. No forms to fill.</span>
+      </p>
+      
+      <div class="success-message" id="successMessage">
+        <strong>🎉 You're all set!</strong><br>
+        Check your phone for a message from your CareConnex agent.
+      </div>
+      
+      <form id="signupForm">
+        <div class="form-group">
+          <label for="name">Your Name</label>
+          <input type="text" id="name" placeholder="e.g., Jennifer Smith" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <div class="phone-input">
+            <select id="country">
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+1">🇨🇦 +1</option>
+              <option value="+44">🇬🇧 +44</option>
+            </select>
+            <input type="tel" id="phone" placeholder="(555) 123-4567" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="channel">How would you like to chat?</label>
+          <select id="channel" required>
+            <option value="sms">SMS / Text Message</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="telegram">Telegram</option>
+          </select>
+        </div>
+        
+        <button type="submit">Get My Care Agent →</button>
+      </form>
+      
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <strong>AI-powered matching</strong> — Finds caregivers based on your specific needs
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <strong>Schedule interviews</strong> — Video calls with top 3 matches
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <strong>24/7 availability</strong> — Text anytime to make changes or ask questions
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('name').value;
+      const phone = document.getElementById('phone').value;
+      const country = document.getElementById('country').value;
+      const channel = document.getElementById('channel').value;
+      
+      // For demo purposes, just show success
+      // In production, this would call your API to create user + send first SMS
+      document.getElementById('successMessage').classList.add('show');
+      document.getElementById('signupForm').reset();
+      
+      // Log for demo
+      console.log('Signup:', { name, phone: country + phone, channel });
+    });
+  </script>
+</body>
+</html>

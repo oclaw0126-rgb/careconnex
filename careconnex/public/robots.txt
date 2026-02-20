@@ -1,0 +1,30 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://careconnex-d4c8b.web.app/sitemap.xml
+
+# Crawl delay for bots
+Crawl-delay: 10
+
+# Disallow admin and private routes
+Disallow: /admin
+Disallow: /client/inbox
+Disallow: /caregiver/inbox
+Disallow: /client/dashboard
+Disallow: /caregiver/dashboard
+Disallow: /client/profile
+Disallow: /caregiver/profile
+Disallow: /client/care-plan
+Disallow: /stripe/
+Disallow: /payment/
+
+# Allow public pages
+Allow: /
+Allow: /how-it-works
+Allow: /pricing
+Allow: /insurance
+Allow: /client/signup
+Allow: /client/login
+Allow: /caregiver/signup
+Allow: /caregiver/login

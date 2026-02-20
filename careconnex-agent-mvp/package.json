@@ -1,0 +1,21 @@
+{
+  "name": "careconnex-agent-mvp",
+  "version": "1.0.0",
+  "description": "AI-powered care coordinator via SMS/WhatsApp",
+  "main": "functions/twilio-webhook.js",
+  "scripts": {
+    "start": "node functions/twilio-webhook.js",
+    "test": "node test/test-agent.js",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-functions": "^4.5.0",
+    "firebase-admin": "^11.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": "20"
+  }
+}

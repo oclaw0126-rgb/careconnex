@@ -1,0 +1,223 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { dbService, authService } from '../services/api';
+import { notificationService } from '../services/notifications';
+import { pushNotificationService } from '../services/pushNotificationService';
+import { isConfigured } from '../lib/firebase';
+import { Appointment, Caregiver, ToastMessage, ToastType, User, UserProfile } from '../types';
+
+/**
+ * Extended user with profile data from Firestore
+ * Combines Firebase Auth User with app-specific profile
+ */
+export interface AuthenticatedUser {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    userType: 'client' | 'caregiver' | 'admin';
+    isVerified?: boolean;
+    phone?: string;
+}
+
+interface CareConnexContextType {
+    currentUser: AuthenticatedUser | null;
+    appointments: Appointment[];
+    caregivers: Caregiver[];
+    isLoading: boolean;
+    toasts: ToastMessage[];
+    addToast: (message: string, type: ToastType) => void;
+    removeToast: (id: string) => void;
+    bookAppointment: (appointment: Appointment) => Promise<void>;
+    completePayment: (appointmentId: string) => void;
+    submitReview: (appointmentId: string) => void;
+}
+
+const CareConnexContext = createContext<CareConnexContextType | undefined>(undefined);
+
+export const CareConnexProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+    // Auth Listener - fetches user profile from Firestore to get userType
+    useEffect(() => {
+        const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
+            if (firebaseUser) {
+                // Fetch user profile from Firestore to get userType
+                try {
+                    const profile = await dbService.getUser(firebaseUser.uid);
+                    const validUserTypes = ['client', 'caregiver', 'admin'] as const;
+                    const userType = validUserTypes.includes(profile?.userType)
+                        ? profile.userType
+                        : 'client';
+                    const authenticatedUser: AuthenticatedUser = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        userType,
+                        isVerified: profile?.verified ?? false,
+                        phone: profile?.phone
+                    };
+                    setCurrentUser(authenticatedUser);
+                    
+                    // Initialize push notifications for logged in user
+                    if (authenticatedUser.uid) {
+                        pushNotificationService.initialize(authenticatedUser.uid).catch(err => {
+                            console.log('Push notification init failed (non-critical):', err);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch user profile:', error);
+                    // Fallback to basic user without type
+                    setCurrentUser({
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        userType: 'client' // Default fallback
+                    });
+                }
+            } else {
+                setCurrentUser(null);
+                // Remove push token on logout
+                pushNotificationService.removeToken('').catch(() => {});
+            }
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
+
+    const addToast = (message: string, type: ToastType) => {
+        const id = Math.random().toString(36).substr(2, 9);
+        setToasts((prev) => [...prev, { id, message, type }]);
+    };
+
+    const removeToast = (id: string) => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+    };
+
+    // Initialize Data
+    useEffect(() => {
+        let cancelled = false;
+
+        const initBackend = async () => {
+            if (isConfigured) {
+                const isConnected = await dbService.verifyConnection();
+                if (cancelled) return;
+                
+                if (isConnected) {
+                    console.log("Database connected");
+                } else {
+                    addToast("Warning: Database connection unstable", "error");
+                }
+            } else {
+                addToast("Backend not configured. Check Firebase setup.", "error");
+            }
+
+            try {
+                const { caregivers: fetched } = await dbService.getCaregivers(100);
+                if (cancelled) return;
+                setCaregivers(fetched);
+            } catch (e) {
+                if (cancelled) return;
+                console.error("Failed to fetch caregivers", e);
+            }
+
+            if (!cancelled) {
+                setIsLoading(false);
+            }
+        };
+
+        initBackend();
+
+        return () => { cancelled = true; };
+
+        // Only subscribe to appointments if user is logged in
+        let unsubscribe: (() => void) | undefined;
+        if (currentUser) {
+            unsubscribe = dbService.subscribeToAppointments(
+                currentUser.uid,
+                currentUser.userType === 'admin' ? 'client' : currentUser.userType,
+                (updatedAppts) => {
+                    setAppointments(updatedAppts);
+                }
+            );
+        }
+
+        const unsubNotifications = notificationService.onNotification((notif) => {
+            addToast(notif.body, 'info');
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+            unsubNotifications();
+            notificationService.stopSimulation();
+        };
+    }, [currentUser]); // Re-subscribe when currentUser changes
+
+    const bookAppointment = async (appointment: Appointment) => {
+        try {
+            setAppointments(prev => [...prev, appointment]); // Optimistic
+            await dbService.createAppointment(appointment);
+            // Success toast is shown in ClientDashboard, not here
+        } catch (error: unknown) {
+            console.error("Booking failed:", error);
+
+            // Revert optimistic update
+            setAppointments(prev => prev.filter(a => a.id !== appointment.id));
+
+            // Show specific error message
+            const errorMessage = error instanceof Error ? error.message : '';
+            if (errorMessage.includes('Database not connected')) {
+                addToast("Unable to connect to server. Please check your internet connection.", 'error');
+            } else if (errorMessage.includes('permission-denied')) {
+                addToast("Permission denied. Please sign in again.", 'error');
+            } else {
+                addToast("Booking saved locally but failed to sync. We'll retry automatically.", 'error');
+            }
+        }
+    };
+
+    const completePayment = (appointmentId: string) => {
+        setAppointments(prev => prev.map(a =>
+            a.id === appointmentId ? { ...a, paymentStatus: 'paid' } : a
+        ));
+        addToast("Payment processing confirmed", 'success');
+    };
+
+    const submitReview = (appointmentId: string) => {
+        setAppointments(prev => prev.map(a =>
+            a.id === appointmentId ? { ...a, hasReview: true } : a
+        ));
+    };
+
+    return (
+        <CareConnexContext.Provider value={{
+            currentUser,
+            appointments,
+            caregivers,
+            isLoading,
+            toasts,
+            addToast,
+            removeToast,
+            bookAppointment,
+            completePayment,
+            submitReview
+        }}>
+            {children}
+        </CareConnexContext.Provider>
+    );
+};
+
+export const useCareConnex = () => {
+    const context = useContext(CareConnexContext);
+    if (context === undefined) {
+        throw new Error('useCareConnex must be used within a CareConnexProvider');
+    }
+    return context;
+};

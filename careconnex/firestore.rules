@@ -1,0 +1,433 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Validate bio length (max 500 characters)
+    function isValidBio(bio) {
+      return bio == null || (bio is string && bio.size() <= 500);
+    }
+    
+    // Check if the current user is the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Check if user has admin role
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+    }
+    
+    // Check if user is a caregiver
+    function isCaregiver() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'caregiver';
+    }
+    
+    // Check if user is a client
+    function isClient() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'client';
+    }
+    
+    // Validate required fields exist (non-empty string check)
+    function hasRequiredFields(data, fields) {
+      return fields.all(field, field in data && data[field] is string && data[field].size() > 0);
+    }
+    
+    // Validate data types
+    function isString(value) {
+      return value is string;
+    }
+    
+    function isNumber(value) {
+      return value is number;
+    }
+    
+    function isBoolean(value) {
+      return value is bool;
+    }
+    
+    function isTimestamp(value) {
+      return value is timestamp;
+    }
+    
+    function isValidISODate(value) {
+      return isString(value) && value.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}');
+    }
+    
+    // ==========================================
+    // USERS COLLECTION
+    // ==========================================
+    match /users/{userId} {
+      // Users can read/write their own document
+      // Admins can read/write any user
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+      
+      // Subcollection: notifications
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) || isAdmin();
+        allow create: if isAuthenticated();
+      }
+    }
+    
+    // ==========================================
+    // CAREGIVERS COLLECTION
+    // ==========================================
+    match /caregivers/{caregiverId} {
+      // Public read for any authenticated user
+      allow read: if isAuthenticated();
+      
+      // CRITICAL FIX: Allow authenticated users to create their own caregiver profile during signup
+      // This must come before the update rule to ensure create is not blocked
+      allow create: if isAuthenticated() && request.auth.uid == caregiverId;
+      
+      // Allow caregivers to update their own document
+      // Caregivers CAN set verificationStatus to 'submitted' to submit for review
+      // Only admin can change verified, backgroundCheckStatus, or set verificationStatus to approved/rejected
+      // BUG FIX: Added bio length validation (max 500 chars)
+      allow update: if (isAuthenticated() && request.auth.uid == caregiverId)
+        && isValidBio(request.resource.data.bio)
+        && (
+          // Allow updates that don't touch restricted fields
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['verified', 'backgroundCheckStatus'])
+          // Allow setting verificationStatus to 'submitted' (caregiver submitting for review)
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationStatus', 'onboardingStep', 'backgroundCheckData'])
+            && request.resource.data.verificationStatus == 'submitted'
+          )
+          // Admin can do anything
+          || isAdmin()
+        );
+      
+      // Admin can delete caregiver profiles
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // SENIOR PROFILES COLLECTION
+    // ==========================================
+    match /senior_profiles/{profileId} {
+      // Only the owner (client) or admin can read/write
+      allow read: if isOwner(profileId) || isAdmin();
+      allow write: if isOwner(profileId) || isAdmin();
+      allow create: if isAuthenticated();
+      
+      // Subcollection: care_plans
+      match /care_plans/{planId} {
+        allow read: if isOwner(profileId) || isAdmin();
+        allow write: if isOwner(profileId) || isAdmin();
+      }
+    }
+    
+    // ==========================================
+    // APPOINTMENTS COLLECTION
+    // ==========================================
+    match /appointments/{appointmentId} {
+      // FIX: Separate list and get permissions for proper ownership checks
+      // Allow authenticated users to list (for queries with .where() filters)
+      allow list: if isAuthenticated();
+      
+      // Individual document read requires explicit ownership check
+      allow get: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Combined read permission (for backward compatibility)
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+      
+      // Create new appointment - must be owned by the creator
+      allow create: if isAuthenticated() && (
+        request.resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // ==========================================
+    // THREADS (CHAT) COLLECTION
+    // ==========================================
+    match /threads/{threadId} {
+      // Only participants can read/write
+      allow read: if isAuthenticated() && 
+        request.auth.uid in resource.data.participants;
+      
+      allow update: if isAuthenticated() && 
+        request.auth.uid in resource.data.participants;
+      
+      allow delete: if isAdmin();
+      
+      // Create new thread
+      allow create: if isAuthenticated() && 
+        request.auth.uid in request.resource.data.participants &&
+        request.resource.data.participants is list &&
+        request.resource.data.participants.size() >= 2;
+      
+      // Subcollection: messages
+      match /messages/{messageId} {
+        // Only thread participants can read/write messages
+        allow read: if isAuthenticated() && 
+          request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participants;
+        
+        allow write: if isAuthenticated() && 
+          request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participants;
+        
+        allow create: if isAuthenticated() && 
+          request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participants &&
+          request.resource.data.senderId == request.auth.uid;
+      }
+    }
+    
+    // ==========================================
+    // REVIEWS COLLECTION
+    // ==========================================
+    match /reviews/{reviewId} {
+      // Public read for everyone
+      allow read: if true;
+      
+      // Only author can update/delete
+      allow update: if isAuthenticated() && 
+        resource.data.clientId == request.auth.uid;
+      
+      allow delete: if isAdmin();
+      
+      // Create new review
+      allow create: if isAuthenticated() && 
+        request.resource.data.clientId == request.auth.uid;
+    }
+    
+    // ==========================================
+    // JOB POSTS COLLECTION
+    // ==========================================
+    match /job_posts/{jobId} {
+      // Public read for open jobs
+      allow read: if true;
+      
+      // Only client who created it or admin can update/delete
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Create new job post
+      allow create: if isAuthenticated() && 
+        request.resource.data.clientId == request.auth.uid;
+    }
+    
+    // ==========================================
+    // JOB APPLICATIONS COLLECTION
+    // ==========================================
+    match /job_applications/{applicationId} {
+      // Caregiver can read their own applications
+      // Client can read applications for their jobs
+      allow read: if isAuthenticated() && (
+        resource.data.caregiverId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Only caregiver can create application
+      allow create: if isAuthenticated() && 
+        request.resource.data.caregiverId == request.auth.uid;
+      
+      // Client can update status (accept/reject)
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // SUPPORT TICKETS COLLECTION
+    // ==========================================
+    match /support_tickets/{ticketId} {
+      // User can read their own tickets
+      // Admins can read all
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Users can create tickets for themselves
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Only admin can update
+      allow update: if isAdmin();
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // NOTIFICATIONS COLLECTION
+    // ==========================================
+    match /notifications/{notificationId} {
+      // Target user or admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Server/Admin can create
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Target user can update (mark as read)
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // MATCH FEEDBACK COLLECTION
+    // ==========================================
+    match /match_feedback/{feedbackId} {
+      // Only feedback creator or admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.seniorId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Any authenticated user can create
+      allow create: if isAuthenticated() && 
+        request.resource.data.seniorId == request.auth.uid;
+      
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // EMERGENCY ALERTS COLLECTION
+    // ==========================================
+    match /emergency_alerts/{alertId} {
+      // Only initiator or admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.initiatorId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Authenticated users can create
+      allow create: if isAuthenticated() && 
+        request.resource.data.initiatorId == request.auth.uid;
+      
+      // Only admin can update (resolve)
+      allow update: if isAdmin();
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // APPOINTMENT CARE PLANS COLLECTION
+    // ==========================================
+    match /appointment_care_plans/{planId} {
+      // Client or caregiver associated with appointment can read
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Only client can create
+      allow create: if isAuthenticated() && 
+        request.resource.data.clientId == request.auth.uid;
+      
+      // Client or caregiver can update (mark tasks completed)
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // VIDEO INTERVIEWS COLLECTION
+    // ==========================================
+    match /video_interviews/{interviewId} {
+      // Client and caregiver can read their own interviews
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Client can create
+      allow create: if isAuthenticated() && 
+        request.resource.data.clientId == request.auth.uid;
+      
+      // Both parties can update
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // CARE JOURNAL ENTRIES COLLECTION
+    // ==========================================
+    match /care_journal_entries/{entryId} {
+      // Family members (linked to senior) and caregiver can read
+      allow read: if isAuthenticated() && (
+        resource.data.caregiverId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Caregiver can create
+      allow create: if isAuthenticated() && 
+        request.resource.data.caregiverId == request.auth.uid;
+      
+      // Caregiver can update
+      allow update: if isAuthenticated() && (
+        resource.data.caregiverId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // DENY ALL OTHER ACCESS BY DEFAULT
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
