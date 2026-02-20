@@ -1,36 +1,36 @@
-// LLM Client - Kimi K2.5 API
+// LLM Client - OpenAI API
 import * as https from 'https';
 import { logger } from './logger';
 
-const KIMI_API_KEY = process.env.KIMI_API_KEY || '';
-const KIMI_API_HOST = 'api.moonshot.cn';
-const KIMI_API_PATH = '/v1/chat/completions';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_API_HOST = 'api.openai.com';
+const OPENAI_API_PATH = '/v1/chat/completions';
 
-export async function callKimiLLM(messages: Array<{role: string; content: string}>): Promise<string> {
-  if (!KIMI_API_KEY) {
-    throw new Error('KIMI_API_KEY not configured');
+export async function callLLM(messages: Array<{role: string; content: string}>): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not configured');
   }
 
   const postData = JSON.stringify({
-    model: 'kimi-k2.5',
+    model: 'gpt-4o-mini',
     messages,
     temperature: 0.7,
     max_tokens: 1000
   });
 
-  logger.info('[Kimi] Sending request', { messageCount: messages.length });
+  logger.info('[OpenAI] Sending request', { messageCount: messages.length });
 
   return new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: KIMI_API_HOST,
-      path: KIMI_API_PATH,
+      hostname: OPENAI_API_HOST,
+      path: OPENAI_API_PATH,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${KIMI_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Length': Buffer.byteLength(postData)
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 30000
     }, (res) => {
       let data = '';
       
@@ -43,37 +43,37 @@ export async function callKimiLLM(messages: Array<{role: string; content: string
           const parsed = JSON.parse(data);
           
           if (parsed.error) {
-            logger.error('[Kimi] API error', { error: parsed.error });
-            reject(new Error(`Kimi API error: ${parsed.error.message}`));
+            logger.error('[OpenAI] API error', { error: parsed.error });
+            reject(new Error(`OpenAI API error: ${parsed.error.message}`));
             return;
           }
           
           if (res.statusCode !== 200) {
-            logger.error('[Kimi] HTTP error', { status: res.statusCode, data });
-            reject(new Error(`Kimi HTTP error: ${res.statusCode}`));
+            logger.error('[OpenAI] HTTP error', { status: res.statusCode, data });
+            reject(new Error(`OpenAI HTTP error: ${res.statusCode}`));
             return;
           }
           
           const content = parsed.choices?.[0]?.message?.content || '';
-          logger.info('[Kimi] Response received', { contentLength: content.length });
+          logger.info('[OpenAI] Response received', { contentLength: content.length });
           resolve(content);
           
         } catch (e) {
-          logger.error('[Kimi] Parse error', { error: e, data });
-          reject(new Error(`Failed to parse Kimi response: ${data}`));
+          logger.error('[OpenAI] Parse error', { error: e, data });
+          reject(new Error(`Failed to parse OpenAI response: ${data}`));
         }
       });
     });
 
     req.on('error', (error) => {
-      logger.error('[Kimi] Request error', { error });
+      logger.error('[OpenAI] Request error', { error });
       reject(error);
     });
 
     req.on('timeout', () => {
-      logger.error('[Kimi] Request timeout');
+      logger.error('[OpenAI] Request timeout');
       req.destroy();
-      reject(new Error('Kimi API timeout'));
+      reject(new Error('OpenAI API timeout'));
     });
 
     req.write(postData);

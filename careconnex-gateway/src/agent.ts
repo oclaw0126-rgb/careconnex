@@ -2,7 +2,7 @@
 // The brain of the CareConnex Gateway
 
 import { CARA_SOUL } from './config';
-import { callKimiLLM } from './llm';
+import { callLLM } from './llm';
 import { executeTool } from './tools';
 import { Session, getOrCreateSession, addToHistory, updateMemory } from './session';
 import { AgentResult, ToolCall, Message } from './types';
@@ -60,7 +60,7 @@ export async function runAgent(
   
   try {
     // Call LLM
-    const llmResponse = await callKimiLLM([
+    const llmResponse = await callLLM([
       { role: 'system', content: 'You are Cara, a care coordinator. Respond naturally or with JSON tool calls.' },
       { role: 'user', content: prompt }
     ]);
@@ -87,7 +87,7 @@ export async function runAgent(
       
       // Get final response after tool execution
       const followUpPrompt = buildFollowUpPrompt(userMessage, parsed.toolCall, result, session);
-      const followUpResponse = await callKimiLLM([
+      const followUpResponse = await callLLM([
         { role: 'system', content: 'You are Cara, a care coordinator.' },
         { role: 'user', content: followUpPrompt }
       ]);
