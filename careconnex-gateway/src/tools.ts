@@ -62,7 +62,7 @@ async function toolSearchCaregivers(
         found: false,
         count: 0,
         caregivers: [],
-        message: `No caregivers found in ${zip_code}. I can email local care agencies to find matches.`
+        message: `I don't have any available caregivers in ${zip_code} right now. Would you like me to check nearby zip codes, or I can notify you when someone becomes available?`
       };
     }
     
@@ -95,7 +95,7 @@ async function toolSearchCaregivers(
       found: false,
       count: 0,
       caregivers: [],
-      message: 'Error searching caregivers. I can email agencies directly to help.'
+      message: 'Having trouble searching right now. Let me try again or you can browse caregivers on the website.'
     };
   }
 }
