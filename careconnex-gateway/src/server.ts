@@ -30,6 +30,20 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    name: 'CareConnex Gateway',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      webhook: '/webhook/whatsapp',
+      stats: '/stats'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   const stats = getSessionStats();
