@@ -41,6 +41,33 @@ const TOOL_SCHEMAS = {
     parameters: {
       reason: { type: 'string', description: 'Why human help is needed' }
     }
+  },
+  send_email: {
+    name: 'send_email',
+    description: 'Send an email to caregivers, agencies, or families',
+    parameters: {
+      to: { type: 'string', description: 'Email address' },
+      subject: { type: 'string', description: 'Email subject line' },
+      body: { type: 'string', description: 'Email body text' }
+    }
+  },
+  send_sms: {
+    name: 'send_sms',
+    description: 'Send SMS text message to phone numbers',
+    parameters: {
+      to: { type: 'string', description: 'Phone number (e.g., +14155551234)' },
+      message: { type: 'string', description: 'SMS message text' }
+    }
+  },
+  book_calendar_event: {
+    name: 'book_calendar_event',
+    description: 'Schedule a calendar event and send invites',
+    parameters: {
+      title: { type: 'string', description: 'Event title' },
+      date: { type: 'string', description: 'Date (e.g., "2026-02-25")' },
+      time: { type: 'string', description: 'Time (e.g., "2:00 PM")' },
+      attendees: { type: 'array', description: 'List of email addresses' }
+    }
   }
 };
 
