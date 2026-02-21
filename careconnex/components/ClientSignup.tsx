@@ -5,6 +5,7 @@ import { LocationInput } from './ui/LocationInput';
 import { Button } from './ui/Button';
 import { ViewType, AddToastFunction } from '../types';
 import { authService } from '../services/api';
+import { normalizePhoneNumber } from '../utils/validation';
 
 // Connect user with Cara AI agent (Railway)
 const connectCaraAgent = async (userData: {
@@ -175,6 +176,9 @@ export const ClientSignup: React.FC<ClientSignupProps> = ({ onNavigate, onShowTo
         throw new Error("Please enter a valid 10-digit phone number");
       }
 
+      // BUG FIX: Normalize phone number before saving
+      const normalizedPhone = normalizePhoneNumber(accountData.phone) || accountData.phone;
+      
       await authService.signup(
         accountData.email,
         accountData.password,
@@ -182,7 +186,7 @@ export const ClientSignup: React.FC<ClientSignupProps> = ({ onNavigate, onShowTo
         'client',
         {
           zipCode: accountData.zipCode,
-          phone: accountData.phone,
+          phone: normalizedPhone,
           needs: careNeeds,
           schedule: schedule,
           genderPreference: genderPref,
@@ -200,7 +204,7 @@ export const ClientSignup: React.FC<ClientSignupProps> = ({ onNavigate, onShowTo
       if (connectWithCara) {
         await connectCaraAgent({
           name: `${accountData.firstName} ${accountData.lastName}`,
-          phone: accountData.phone,
+          phone: normalizedPhone, // Already normalized above
           telegramUsername,
           messagingPreference,
           zipCode: accountData.zipCode,

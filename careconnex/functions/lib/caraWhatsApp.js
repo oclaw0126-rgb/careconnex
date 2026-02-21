@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCaraStats = exports.sendWhatsAppWelcome = exports.whatsappWebhook = void 0;
+exports.getCaraStats = exports.whatsappWebhook = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const caraAgentV2_1 = require("./caraAgentV2");
@@ -140,33 +140,6 @@ function escapeXml(text) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
 }
-/**
- * Send welcome message to new users
- */
-exports.sendWhatsAppWelcome = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c;
-    const { phoneNumber, name } = data;
-    const twilioSid = ((_a = functions.config().twilio) === null || _a === void 0 ? void 0 : _a.sid) || process.env.TWILIO_SID;
-    const twilioToken = ((_b = functions.config().twilio) === null || _b === void 0 ? void 0 : _b.token) || process.env.TWILIO_TOKEN;
-    const twilioWhatsAppNumber = ((_c = functions.config().twilio) === null || _c === void 0 ? void 0 : _c.whatsapp_number) || process.env.TWILIO_WHATSAPP_NUMBER;
-    if (!twilioSid || !twilioToken) {
-        return { success: false, error: 'Twilio not configured' };
-    }
-    try {
-        const twilio = require('twilio')(twilioSid, twilioToken);
-        const welcomeMessage = `👋 Hi${name ? ' ' + name : ''}! I'm Cara from CareConnex.\n\nI'm here to help you find the perfect caregiver for your loved one. Just reply with your zip code and I'll search for qualified caregivers in your area!`;
-        await twilio.messages.create({
-            body: welcomeMessage,
-            from: `whatsapp:${twilioWhatsAppNumber}`,
-            to: `whatsapp:${phoneNumber}`
-        });
-        return { success: true };
-    }
-    catch (error) {
-        console.error('Error sending welcome:', error);
-        return { success: false, error: error.message };
-    }
-});
 /**
  * Get Cara stats
  */

@@ -135,30 +135,41 @@ export const CareConnexProvider: React.FC<{ children: ReactNode }> = ({ children
 
         initBackend();
 
-        return () => { cancelled = true; };
-
-        // Only subscribe to appointments if user is logged in
-        let unsubscribe: (() => void) | undefined;
-        if (currentUser) {
-            unsubscribe = dbService.subscribeToAppointments(
-                currentUser.uid,
-                currentUser.userType === 'admin' ? 'client' : currentUser.userType,
-                (updatedAppts) => {
-                    setAppointments(updatedAppts);
-                }
-            );
-        }
-
+        // Subscribe to notifications
         const unsubNotifications = notificationService.onNotification((notif) => {
             addToast(notif.body, 'info');
         });
 
-        return () => {
-            if (unsubscribe) unsubscribe();
+        return () => { 
+            cancelled = true;
             unsubNotifications();
             notificationService.stopSimulation();
         };
-    }, [currentUser]); // Re-subscribe when currentUser changes
+    }, []); // Only run once on mount
+
+    // BUG FIX: Separate useEffect for appointment subscription
+    // This prevents memory leaks and ensures proper cleanup
+    useEffect(() => {
+        if (!currentUser) {
+            setAppointments([]); // Clear appointments when logged out
+            return;
+        }
+
+        console.log('[CareConnex] Subscribing to appointments for', currentUser.uid);
+        
+        const unsubscribe = dbService.subscribeToAppointments(
+            currentUser.uid,
+            currentUser.userType === 'admin' ? 'client' : currentUser.userType,
+            (updatedAppts) => {
+                setAppointments(updatedAppts);
+            }
+        );
+
+        return () => {
+            console.log('[CareConnex] Unsubscribing from appointments');
+            unsubscribe();
+        };
+    }, [currentUser?.uid, currentUser?.userType]); // Only re-subscribe when user changes
 
     const bookAppointment = async (appointment: Appointment) => {
         try {

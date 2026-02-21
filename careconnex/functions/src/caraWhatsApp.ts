@@ -127,38 +127,6 @@ function escapeXml(text: string): string {
 }
 
 /**
- * Send welcome message to new users
- */
-export const sendWhatsAppWelcome = functions.https.onCall(async (data, context) => {
-  const { phoneNumber, name } = data;
-  
-  const twilioSid = functions.config().twilio?.sid || process.env.TWILIO_SID;
-  const twilioToken = functions.config().twilio?.token || process.env.TWILIO_TOKEN;
-  const twilioWhatsAppNumber = functions.config().twilio?.whatsapp_number || process.env.TWILIO_WHATSAPP_NUMBER;
-
-  if (!twilioSid || !twilioToken) {
-    return { success: false, error: 'Twilio not configured' };
-  }
-
-  try {
-    const twilio = require('twilio')(twilioSid, twilioToken);
-
-    const welcomeMessage = `👋 Hi${name ? ' ' + name : ''}! I'm Cara from CareConnex.\n\nI'm here to help you find the perfect caregiver for your loved one. Just reply with your zip code and I'll search for qualified caregivers in your area!`;
-
-    await twilio.messages.create({
-      body: welcomeMessage,
-      from: `whatsapp:${twilioWhatsAppNumber}`,
-      to: `whatsapp:${phoneNumber}`
-    });
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error sending welcome:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-/**
  * Get Cara stats
  */
 export const getCaraStats = functions.https.onCall(async (data, context) => {

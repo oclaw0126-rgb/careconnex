@@ -395,7 +395,11 @@ function escapeXml(text: string): string {
 // Start server
 app.listen(PORT, () => {
   logger.info(`[Server] CareConnex Gateway running on port ${PORT}`);
-  logger.info(`[Server] Webhook URL: https://your-railway-url.railway.app/webhook/whatsapp`);
+  // BUG FIX: Use actual Railway URL from environment
+  const webhookUrl = process.env.RAILWAY_STATIC_URL 
+    ? `${process.env.RAILWAY_STATIC_URL}/webhook/whatsapp`
+    : `http://localhost:${PORT}/webhook/whatsapp`;
+  logger.info(`[Server] Webhook URL: ${webhookUrl}`);
 });
 
 export default app;

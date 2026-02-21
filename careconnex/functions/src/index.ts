@@ -35,7 +35,6 @@ export * from './telegramBot';
 
 // Export Cara Agent Connection Functions (Railway)
 export * from './caraRailway';
-export * from './caraWelcome';
 
 // Export WhatsApp Functions (Legacy - Phase 0)
 // export * from './whatsapp';

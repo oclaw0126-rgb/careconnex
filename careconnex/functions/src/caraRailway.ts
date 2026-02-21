@@ -34,8 +34,7 @@ export const connectCaraAgent = functions.https.onRequest(async (req, res) => {
       messagingPreference = 'whatsapp',
       zipCode,
       needs,
-      schedule,
-      userId 
+      schedule
     } = req.body;
 
     if (!phone) {
@@ -87,7 +86,8 @@ export const connectCaraAgent = functions.https.onRequest(async (req, res) => {
     });
 
     // 4. Send welcome message via Railway Cara
-    const RAILWAY_URL = 'https://careconnex-production.up.railway.app';
+    // BUG FIX: Use environment variable instead of hard-coded URL
+    const RAILWAY_URL = process.env.RAILWAY_URL || 'https://careconnex-production.up.railway.app';
     
     const welcomeMessage = messagingPreference === 'whatsapp' 
       ? `👋 Hi ${name?.split(' ')[0] || 'there'}! I'm Cara, your CareConnex care coordinator.\n\nI can help you:\n• Find caregivers in ${zipCode || 'your area'}\n• Schedule interviews\n• Get care updates\n• Book appointments\n\nWhat type of care do you need? (e.g., companionship, dementia care, mobility assistance)`
@@ -222,9 +222,9 @@ export const caraWebhook = functions.https.onRequest(async (req, res) => {
 
     res.json({ success: true });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Cara webhook error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message || 'Unknown error' });
   }
 });
 

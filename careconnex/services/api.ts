@@ -486,11 +486,10 @@ export const dbService = {
     getCaregivers: async (limitSize: number = 10, lastDoc: firebase.firestore.QueryDocumentSnapshot | null = null): Promise<{ caregivers: Caregiver[], lastDoc: firebase.firestore.QueryDocumentSnapshot | null }> => {
         if (isConfigured && db) {
             try {
-                // Try to get approved caregivers first
+                // BUG FIX: Simple query without composite index requirement
+                // Fetch all and filter in memory to avoid Firestore index issues
                 let query = db.collection('caregivers')
-                    .where('verificationStatus', '==', 'approved')
-                    .orderBy('name')
-                    .limit(limitSize);
+                    .limit(limitSize * 2); // Fetch more to allow for filtering
 
                 if (lastDoc) {
                     query = query.startAfter(lastDoc);
@@ -498,35 +497,33 @@ export const dbService = {
 
                 let querySnapshot = await query.get();
                 
-                // Fallback: if no approved caregivers, fetch all caregivers (for dev/demo)
-                if (querySnapshot.empty) {
-                    console.log('No approved caregivers found, fetching all caregivers...');
-                    let fallbackQuery = db.collection('caregivers')
-                        .orderBy('name')
-                        .limit(limitSize);
-                    
-                    if (lastDoc) {
-                        fallbackQuery = fallbackQuery.startAfter(lastDoc);
-                    }
-                    
-                    querySnapshot = await fallbackQuery.get();
-                }
-                
-                if (querySnapshot.empty) return { caregivers: [], lastDoc: null };
-
-                const caregivers: Caregiver[] = [];
+                // Filter approved caregivers client-side (avoids composite index)
+                let caregivers: Caregiver[] = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    // Validate required fields before casting
-                    if (!data || !data.name) {
-                        console.warn(`Invalid caregiver document: ${doc.id}`);
-                        return;
+                    if (data && data.name && data.verificationStatus === 'approved') {
+                        caregivers.push({ id: doc.id, ...data } as Caregiver);
                     }
-                    caregivers.push({ 
-                        id: doc.id, 
-                        ...data 
-                    } as Caregiver);
                 });
+                
+                // If no approved caregivers, try fetching all (for dev/demo)
+                if (caregivers.length === 0 && querySnapshot.size > 0) {
+                    console.log('No approved caregivers found, fetching all caregivers...');
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        if (data && data.name) {
+                            caregivers.push({ id: doc.id, ...data } as Caregiver);
+                        }
+                    });
+                }
+                
+                // Sort by name client-side
+                caregivers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                
+                // Limit to requested size
+                caregivers = caregivers.slice(0, limitSize);
+                
+                if (caregivers.length === 0) return { caregivers: [], lastDoc: null };
 
                 return {
                     caregivers,
@@ -536,24 +533,6 @@ export const dbService = {
                 if (isFirebaseError(err) && err.code === 'permission-denied') {
                     console.warn("Firestore permission denied for caregivers. Check rules.");
                     throw new Error('Access denied. Please check your account permissions.');
-                }
-                // If index error, try without filter
-                if (isFirebaseError(err) && err.code === 'failed-precondition') {
-                    console.warn('Missing Firestore index for caregivers query, fetching without filter...');
-                    try {
-                        const fallbackQuery = db.collection('caregivers').limit(limitSize);
-                        const fallbackSnapshot = await fallbackQuery.get();
-                        const caregivers: Caregiver[] = [];
-                        fallbackSnapshot.forEach((doc) => {
-                            const data = doc.data();
-                            if (data && data.name) {
-                                caregivers.push({ id: doc.id, ...data } as Caregiver);
-                            }
-                        });
-                        return { caregivers, lastDoc: fallbackSnapshot.docs[fallbackSnapshot.docs.length - 1] || null };
-                    } catch (fallbackErr) {
-                        console.error('Fallback query also failed:', fallbackErr);
-                    }
                 }
                 console.error("Firestore read failed", err);
                 throw new Error('Failed to fetch caregivers. Please try again.');
@@ -694,7 +673,9 @@ export const dbService = {
         }
 
         if (isConfigured && db) {
-            return await db.runTransaction(async (transaction) => {
+            // BUG FIX: Wrap transaction in try-catch for better error handling
+            try {
+                return await db.runTransaction(async (transaction) => {
                 // Extract date and time for availability check
                 const { caregiverId, date, time, clientId } = appointmentData;
                 
@@ -779,6 +760,24 @@ export const dbService = {
                 
                 return cleanedAppt as unknown as Appointment;
             });
+            } catch (error: any) {
+                // BUG FIX: Provide specific error messages for common transaction failures
+                console.error('[createAppointment] Transaction failed:', error);
+                
+                if (error.message?.includes('time slot is currently being booked')) {
+                    throw new Error('This time slot is being booked by another user. Please try a different time.');
+                } else if (error.message?.includes('no longer available')) {
+                    throw new Error('This time slot is no longer available. Please select a different time.');
+                } else if (error.message?.includes('already have an appointment')) {
+                    throw new Error('You already have an appointment at this time.');
+                } else if (error.code === 'permission-denied') {
+                    throw new Error('Permission denied. Please sign in again.');
+                } else if (error.code === 'unavailable') {
+                    throw new Error('Service temporarily unavailable. Please try again.');
+                } else {
+                    throw new Error('Booking failed: ' + (error.message || 'Unknown error'));
+                }
+            }
         }
         throw new Error("Database not connected");
     },

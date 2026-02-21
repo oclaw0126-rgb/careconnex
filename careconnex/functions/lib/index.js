@@ -62,8 +62,8 @@ __exportStar(require("./instantPayout"), exports);
 __exportStar(require("./twilio"), exports);
 // Export Telegram Bot Functions
 __exportStar(require("./telegramBot"), exports);
-// Export Cara Agent Connection Functions
-// export * from './caraConnection';
+// Export Cara Agent Connection Functions (Railway)
+__exportStar(require("./caraRailway"), exports);
 // Export WhatsApp Functions (Legacy - Phase 0)
 // export * from './whatsapp';
 // Export Phase 1: LLM-Powered Cara Agent

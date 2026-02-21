@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "skills": {
+    "windows-control": {
+      "version": "1.0.0",
+      "installedAt": 1770515565113
+    },
+    "critical-code-reviewer": {
+      "version": "0.1.0",
+      "installedAt": 1770578922092
+    },
+    "playwright-testing": {
+      "version": "1.0.0",
+      "installedAt": 1770616491817
+    },
+    "react-perf": {
+      "version": "1.0.0",
+      "installedAt": 1770616510619
+    },
+    "perf-profiler": {
+      "version": "1.0.0",
+      "installedAt": 1770616539487
+    },
+    "daily-standup": {
+      "version": "1.1.0",
+      "installedAt": 1770935550533
+    },
+    "todo": {
+      "version": "1.1.0",
+      "installedAt": 1770935553064
+    },
+    "decision-frameworks": {
+      "version": "1.0.0",
+      "installedAt": 1770935556034
+    },
+    "test-master": {
+      "version": "0.1.0",
+      "installedAt": 1770935559451
+    },
+    "project-documentation": {
+      "version": "1.0.0",
+      "installedAt": 1770935562038
+    },
+    "vision-analyze": {
+      "version": "1.0.0",
+      "installedAt": 1770988926883
+    },
+    "screen-vision": {
+      "version": "1.0.1",
+      "installedAt": 1770988929134
+    },
+    "security-auditor": {
+      "version": "1.0.0",
+      "installedAt": 1770993850653
+    },
+    "stripe": {
+      "version": "1.1.0",
+      "installedAt": 1770993860777
+    },
+    "self-evolve": {
+      "version": "1.0.0",
+      "installedAt": 1771091595499
+    },
+    "self-improving-agent-1-0-2": {
+      "version": "1.0.0",
+      "installedAt": 1771091644237
+    }
+  }
+}
