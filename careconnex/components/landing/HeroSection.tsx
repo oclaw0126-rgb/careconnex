@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, MapPin, CheckCircle, Star, AlertCircle } from 'lucide-react';
+import { ShieldCheck, MapPin, CheckCircle, MessageCircle, AlertCircle, Phone } from 'lucide-react';
 import { ViewType } from '../../types';
 import { Button } from '../ui/Button';
 import { validateZipCode } from '../../utils/validation';
@@ -31,6 +31,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
         if (error) setError('');
     };
 
+    // WhatsApp number for Cara
+    const caraWhatsAppNumber = '+15595204349';
+
     return (
         <section className="relative overflow-hidden pt-12 pb-20 lg:pt-24 lg:pb-32 bg-slate-50">
             {/* Background Decor */}
@@ -43,15 +46,66 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                 <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                     {/* Text Content */}
                     <div className="space-y-8 animate-slide-in relative z-10">
-                        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/60 backdrop-blur-sm border border-green-200 text-green-700 text-sm font-semibold shadow-sm mb-2">
-                            <ShieldCheck className="w-4 h-4 mr-2 text-green-600" /> #1 Trusted Care Marketplace
+                        {/* Location Badge */}
+                        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-sm font-semibold shadow-sm mb-2">
+                            <MapPin className="w-4 h-4 mr-2 text-teal-600" /> Now Serving Santa Clara County
                         </div>
+
                         <h1 className="text-5xl lg:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
                             Care that feels like <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-cyan-500 to-blue-500">family.</span>
                         </h1>
+
                         <p className="text-xl text-slate-600 max-w-lg leading-relaxed font-light">
-                            Find verified, local caregivers for your loved ones in minutes. <span className="font-semibold text-slate-800">Background checked. Interviewed. Insured.</span>
+                            Find verified, local caregivers for your loved ones in minutes. <span className="font-semibold text-slate-800">Background checked. Interviewed. Insured by Bunker.</span>
                         </p>
+
+                        {/* Pricing Upfront */}
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm inline-flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-green-100 p-2 rounded-full">
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-900">$22-35/hour</p>
+                                    <p className="text-sm text-slate-500">No agency markup</p>
+                                </div>
+                            </div>
+                            <div className="hidden sm:block w-px h-10 bg-slate-200"></div>
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-100 p-2 rounded-full">
+                                    <ShieldCheck className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-900">Insurance Included</p>
+                                    <p className="text-sm text-slate-500">Powered by Bunker</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CARA - Featured Prominently */}
+                        <div className="bg-gradient-to-r from-teal-600 to-cyan-600 p-6 rounded-3xl shadow-xl shadow-teal-500/20 text-white">
+                            <div className="flex items-start gap-4">
+                                <div className="bg-white/20 p-3 rounded-2xl">
+                                    <MessageCircle className="w-8 h-8 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold mb-1">Meet Cara, Your AI Care Coordinator</h3>
+                                    <p className="text-teal-100 text-sm mb-4">
+                                        Text Cara on WhatsApp and she'll find the perfect caregiver for your needs. Available 24/7.
+                                    </p>
+                                    <a 
+                                        href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20I%20need%20help%20finding%20a%20caregiver`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 bg-white text-teal-700 px-6 py-3 rounded-xl font-semibold hover:bg-teal-50 transition-colors"
+                                    >
+                                        <Phone className="w-4 h-4" />
+                                        Text Cara on WhatsApp
+                                    </a>
+                                    <p className="text-teal-200 text-xs mt-2">{caraWhatsAppNumber}</p>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Search Box */}
                         <div className="bg-white/80 backdrop-blur-md p-3 rounded-3xl shadow-2xl shadow-slate-200/50 border border-white/50 flex flex-col sm:flex-row gap-2 max-w-xl transition-all hover:shadow-teal-500/5 hover:scale-[1.01]">
@@ -62,7 +116,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     maxLength={5}
-                                    placeholder="Enter Zip Code"
+                                    placeholder="Enter Zip Code (e.g., 95050)"
                                     className={`w-full pl-12 pr-4 py-4 rounded-2xl bg-teal-50/50 focus:bg-white focus:ring-4 ${error ? 'focus:ring-red-100 border-2 border-red-300' : 'focus:ring-teal-100'} outline-none text-slate-700 font-medium placeholder:text-slate-400 transition-all placeholder:font-normal`}
                                     value={zipCode}
                                     onChange={handleZipChange}
@@ -86,8 +140,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                             </div>
                         )}
 
+                        {/* Trust Indicators */}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 pl-2 font-medium">
+                            <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-teal-500" /> Free to post</span>
+                            <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-teal-500" /> No hidden fees</span>
+                            <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-teal-500" /> Background checked</span>
+                        </div>
+
+                        {/* Service Area */}
+                        <div className="pt-4 border-t border-slate-200">
+                            <p className="text-sm text-slate-500">
+                                <span className="font-semibold text-slate-700">Service Areas:</span> San Jose, Santa Clara, Sunnyvale, Mountain View, Palo Alto, Cupertino, Los Gatos, Campbell, Milpitas & surrounding areas
+                            </p>
+                        </div>
+
                         {/* Secondary CTA for Caregivers */}
-                        <div className="mt-2 text-sm text-slate-500">
+                        <div className="text-sm text-slate-500">
                             Are you a caregiver?{' '}
                             <button 
                                 onClick={() => onNavigate('caregiver-signup')}
@@ -95,40 +163,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                             >
                                 Find paid care jobs →
                             </button>
-                        </div>
-
-                        {/* Phase 1: Express Booking CTA */}
-                        <div className="pt-4 border-t border-slate-200">
-                            <p className="text-sm text-slate-500 mb-3">Need care urgently? Skip the search.</p>
-                            <Button 
-                                variant="secondary"
-                                size="lg"
-                                onClick={() => window.location.href = '/book-now'}
-                                className="w-full sm:w-auto rounded-2xl border-2 border-teal-200 hover:border-teal-300"
-                            >
-                                ⚡ Book in 2 Minutes
-                            </Button>
-                        </div>
-
-                        <div className="flex items-center gap-6 text-sm text-slate-500 pl-2 font-medium">
-                            <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-teal-500" /> Free to post</span>
-                            <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-teal-500" /> No hidden fees</span>
-                        </div>
-
-                        {/* Live Stats */}
-                        <div className="flex gap-8 pt-4 border-t border-slate-200">
-                            <div>
-                                <span className="block text-2xl font-bold text-teal-600">50k+</span>
-                                <span className="text-xs text-slate-500">Successful Matches</span>
-                            </div>
-                            <div>
-                                <span className="block text-2xl font-bold text-teal-600">4.9</span>
-                                <span className="text-xs text-slate-500">Average Rating</span>
-                            </div>
-                            <div>
-                                <span className="block text-2xl font-bold text-teal-600">$2M+</span>
-                                <span className="text-xs text-slate-500">Saved by Families</span>
-                            </div>
                         </div>
                     </div>
 
@@ -141,7 +175,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                             className="absolute top-0 right-0 w-4/5 h-4/5 object-cover rounded-[3rem] shadow-2xl shadow-teal-900/10 z-10 transform -rotate-2 hover:rotate-0 transition-transform duration-700 ease-out"
                         />
 
-                        {/* Floating Trust Card 1 */}
+                        {/* Floating Trust Card - Verified */}
                         <div className="absolute top-1/2 left-0 z-20 bg-white/90 backdrop-blur-lg p-5 rounded-3xl shadow-xl shadow-slate-300/40 border border-white/50 flex items-center gap-4 animate-bounce duration-[3000ms]">
                             <div className="bg-green-100 p-3.5 rounded-full ring-4 ring-green-50">
                                 <ShieldCheck className="w-7 h-7 text-green-600" />
@@ -152,18 +186,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                             </div>
                         </div>
 
-                        {/* Floating Trust Card 2 */}
-                        <div className="absolute bottom-20 right-20 z-20 bg-white/90 backdrop-blur-lg p-5 rounded-3xl shadow-xl shadow-slate-300/40 border border-white/50 flex items-center gap-4 hover:-translate-y-1 transition-transform">
-                            <div className="flex -space-x-4">
-                                <img src="https://ui-avatars.com/api/?name=Sarah+M&background=0D9488&color=fff&size=128" className="w-12 h-12 rounded-full border-4 border-white shadow-sm" alt="Happy customer Sarah" />
-                                <img src="https://ui-avatars.com/api/?name=Michael+R&background=0284C7&color=fff&size=128" className="w-12 h-12 rounded-full border-4 border-white shadow-sm" alt="Happy customer Michael" />
-                                <img src="https://ui-avatars.com/api/?name=Emma+J&background=F97316&color=fff&size=128" className="w-12 h-12 rounded-full border-4 border-white shadow-sm" alt="Happy customer Emma" />
+                        {/* Floating Trust Card - Insurance */}
+                        <div className="absolute bottom-32 right-10 z-20 bg-white/90 backdrop-blur-lg p-5 rounded-3xl shadow-xl shadow-slate-300/40 border border-white/50 flex items-center gap-4">
+                            <div className="bg-blue-100 p-3.5 rounded-full ring-4 ring-blue-50">
+                                <CheckCircle className="w-7 h-7 text-blue-600" />
                             </div>
                             <div>
-                                <p className="font-bold text-slate-900">50k+ Matches</p>
-                                <div className="flex text-orange-400 gap-0.5 mt-0.5">
-                                    {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
-                                </div>
+                                <p className="font-bold text-slate-900">Insured by Bunker</p>
+                                <p className="text-sm text-slate-500">Coverage included</p>
                             </div>
                         </div>
                     </div>
@@ -179,12 +209,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                             <div className="absolute bottom-4 left-4 right-4">
                                 <div className="flex items-center gap-2 text-white text-sm">
-                                    <div className="flex -space-x-2">
-                                        {[1, 2, 3].map((i) => (
-                                            <div key={i} className="w-8 h-8 rounded-full bg-white/20 border-2 border-white backdrop-blur-sm" />
-                                        ))}
-                                    </div>
-                                    <span>Trusted by 50k+ families</span>
+                                    <ShieldCheck className="w-5 h-5 text-green-400" />
+                                    <span>Verified & Insured Caregivers</span>
                                 </div>
                             </div>
                         </div>
