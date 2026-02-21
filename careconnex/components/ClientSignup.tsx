@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { ViewType, AddToastFunction } from '../types';
 import { authService } from '../services/api';
 
-// Connect user with Cara AI agent
+// Connect user with Cara AI agent (Railway)
 const connectCaraAgent = async (userData: {
   name: string;
   phone: string;
@@ -15,18 +15,16 @@ const connectCaraAgent = async (userData: {
   zipCode: string;
   needs: string[];
   schedule: string[];
-}) => {
+}, userId?: string) => {
   try {
-    // Call the appropriate Cloud Function based on messaging preference
-    let functionName = 'connectCaraAgent';
-    if (userData.messagingPreference === 'whatsapp') {
-      functionName = 'sendWhatsAppWelcome';
-    }
-
-    const response = await fetch(`https://us-central1-careconnex-d4c8b.cloudfunctions.net/${functionName}`, {
+    // Call the Railway-connected Cloud Function
+    const response = await fetch('https://us-central1-careconnex-d4c8b.cloudfunctions.net/connectCaraAgent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
+      body: JSON.stringify({
+        ...userData,
+        userId
+      })
     });
     return await response.json();
   } catch (error) {
