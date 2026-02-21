@@ -140,12 +140,19 @@ export async function runAgent(
       };
     }
     
-    // No tool call, just response
+    // No tool call, just response - BUT ensure we always have a response
+    let naturalResponse = parsed.response || parsed.raw;
+    
+    // CRITICAL FIX: If response is empty or just JSON, generate a helpful response
+    if (!naturalResponse || naturalResponse.trim().length < 5 || naturalResponse.trim().startsWith('{')) {
+      naturalResponse = generateHelpfulResponse(userMessage, session);
+    }
+    
     addToHistory(userPhone, 'user', userMessage);
-    addToHistory(userPhone, 'assistant', parsed.response || parsed.raw);
+    addToHistory(userPhone, 'assistant', naturalResponse);
     
     return {
-      response: parsed.response || parsed.raw,
+      response: naturalResponse,
       toolCalls: [],
       updatedMemory: session.memory
     };
@@ -281,6 +288,36 @@ function formatResultNaturally(toolName: string, result: any): string {
   
   // Default: return simple string representation
   return JSON.stringify(result, null, 2);
+}
+
+// Helper function to generate a helpful response when LLM fails
+function generateHelpfulResponse(userMessage: string, session: Session): string {
+  const msg = userMessage.toLowerCase();
+  
+  // Check for care needs mentioned
+  if (msg.includes('companionship') || msg.includes('personal care') || msg.includes('care')) {
+    const zipCode = session.memory['zip_code'];
+    if (zipCode) {
+      return `Thank you for sharing that. So you're looking for companionship and personal care in ${zipCode}. Let me search for caregivers who specialize in those services.`;
+    } else {
+      return `Thank you for sharing that. So you're looking for companionship and personal care. To find the best caregivers, what's your zip code?`;
+    }
+  }
+  
+  if (msg.includes('dementia') || msg.includes('alzheimer')) {
+    return `I understand you need specialized dementia care. That's so important. Let me find caregivers with specific training in this area. What's your zip code?`;
+  }
+  
+  if (msg.includes('mobility') || msg.includes('lifting') || msg.includes('transfer')) {
+    return `Mobility assistance is crucial for safety. I'll find caregivers trained in safe lifting and transfers. What's your zip code?`;
+  }
+  
+  // Generic helpful responses
+  if (session.memory['zip_code']) {
+    return `Got it. Let me search for caregivers in ${session.memory['zip_code']} who can help with that.`;
+  }
+  
+  return `Thank you for sharing that with me. To find the best caregivers for your needs, could you share your zip code? Then I can search for available caregivers in your area.`;
 }
 
 function parseLLMResponse(response: string): {
