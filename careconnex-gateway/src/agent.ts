@@ -112,21 +112,29 @@ export async function runAgent(
         updateMemory(userPhone, parsed.toolCall.parameters.key, parsed.toolCall.parameters.value);
       }
       
-      // Get final response after tool execution
+      // Get final response after tool execution - CRITICAL FIX: Always respond naturally
       const followUpPrompt = buildFollowUpPrompt(userMessage, parsed.toolCall, result, session);
       const followUpResponse = await callLLM([
-        { role: 'system', content: 'You are Cara, a care coordinator.' },
+        { role: 'system', content: 'You are Cara, a care coordinator. CRITICAL: Always respond in natural, conversational language. NEVER respond with JSON, code, or technical formatting.' },
         { role: 'user', content: followUpPrompt }
       ]);
       
       const finalParsed = parseLLMResponse(followUpResponse);
       
+      // Ensure we have a natural response, not JSON
+      let finalResponse = finalParsed.response || finalParsed.raw;
+      
+      // Extra safety: if response starts with {, it's JSON - replace with friendly message
+      if (finalResponse.trim().startsWith('{')) {
+        finalResponse = formatResultNaturally(parsed.toolCall.tool, result);
+      }
+      
       // Update conversation history
       addToHistory(userPhone, 'user', userMessage);
-      addToHistory(userPhone, 'assistant', finalParsed.response || finalParsed.raw);
+      addToHistory(userPhone, 'assistant', finalResponse);
       
       return {
-        response: finalParsed.response || finalParsed.raw,
+        response: finalResponse,
         toolCalls: [parsed.toolCall],
         updatedMemory: session.memory
       };
@@ -205,28 +213,74 @@ function buildFollowUpPrompt(
   toolResult: any,
   session: Session
 ): string {
+  // Format result naturally for the prompt
+  const naturalResult = formatResultNaturally(toolCall.tool, toolResult);
+  
   return `${CARA_SOUL}
 
 ---
 
-TOOL EXECUTED:
-Tool: ${toolCall.tool}
-Parameters: ${JSON.stringify(toolCall.parameters)}
-Result: ${JSON.stringify(toolResult)}
+SEARCH/TOOL RESULTS (use this to respond):
+${naturalResult}
 
 ---
 
-USER ORIGINAL MESSAGE:
+ORIGINAL USER MESSAGE:
 "${userMessage}"
 
 ---
 
-INSTRUCTIONS:
-Now respond to the user with the tool result. Be natural and conversational.
-If caregivers were found, present them nicely and ask which they want to interview.
-If interview was scheduled, confirm the details.
+CRITICAL INSTRUCTIONS:
+1. Respond ONLY in natural, warm conversational text
+2. NEVER show JSON, code, or technical formatting
+3. Present results as if talking to a family member
+4. Be proactive - suggest next steps
+5. If caregivers found, introduce each warmly with their details
+6. Ask which caregiver they'd like to interview
 
-RESPOND:`;
+EXAMPLE GOOD RESPONSE:
+"Great news! I found 2 wonderful caregivers near you:
+
+Maria has 8 years of experience with dementia care and charges $28/hour. Families love her compassionate approach.
+
+John specializes in mobility assistance with 5 years experience at $25/hour. He's known for his patience.
+
+Which one would you like to meet? I can schedule a video interview for you."
+
+YOUR NATURAL RESPONSE (no JSON, no code):`;
+}
+
+// Helper function to format tool results naturally
+function formatResultNaturally(toolName: string, result: any): string {
+  if (toolName === 'search_caregivers') {
+    if (result.found && result.caregivers?.length > 0) {
+      let summary = `✅ Found ${result.count} caregiver(s):\n\n`;
+      result.caregivers.forEach((c: any, i: number) => {
+        summary += `${i+1}. ${c.name}\n`;
+        summary += `   Rate: $${c.hourlyRate}/hour\n`;
+        summary += `   Experience: ${c.yearsExperience} years\n`;
+        summary += `   Rating: ${c.rating}/5 stars\n`;
+        summary += `   Specialties: ${c.specialties?.join(', ') || 'General care'}\n`;
+        summary += `   Bio: ${c.bio}\n\n`;
+      });
+      return summary;
+    } else {
+      return `❌ No caregivers found: ${result.message}`;
+    }
+  }
+  
+  if (toolName === 'schedule_interview') {
+    return result.success 
+      ? `✅ ${result.message}`
+      : `❌ ${result.message}`;
+  }
+  
+  if (toolName === 'store_memory') {
+    return result.success ? '✅ Information saved' : '❌ Failed to save';
+  }
+  
+  // Default: return simple string representation
+  return JSON.stringify(result, null, 2);
 }
 
 function parseLLMResponse(response: string): {
