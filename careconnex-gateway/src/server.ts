@@ -23,7 +23,7 @@ if (firebaseProjectId) {
   logger.warn('[Firebase] No project ID configured');
 }
 
-const db = admin.firestore();
+const db = new Proxy({}, { get: (_, prop) => (admin.firestore() as any)[prop] }) as FirebaseFirestore.Firestore;
 initializeTools(db);
 
 // Express app

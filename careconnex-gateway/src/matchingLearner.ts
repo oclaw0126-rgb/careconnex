@@ -5,7 +5,7 @@ import * as admin from 'firebase-admin';
 import { callLLM } from './llm';
 import { logger } from './logger';
 
-const db = admin.firestore();
+const db = new Proxy({}, { get: (_, prop) => (admin.firestore() as any)[prop] }) as FirebaseFirestore.Firestore;
 
 // Match outcome tracking
 interface MatchOutcome {

@@ -5,7 +5,7 @@ import { logger } from './logger';
 import { callLLM } from './llm';
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
+const db = new Proxy({}, { get: (_, prop) => (admin.firestore() as any)[prop] }) as FirebaseFirestore.Firestore;
 
 // Sub-Agent Types
 export type SubAgentType = 'matcher' | 'scheduler' | 'reporter' | 'overnight';
@@ -94,7 +94,7 @@ async function executeSubAgent(
     await db.collection('subagent_tasks').doc(taskId).update({
       status: 'failed',
       completedAt: new Date(),
-      result: { error: error.message }
+      result: { error: (error as Error).message }
     });
   }
 }

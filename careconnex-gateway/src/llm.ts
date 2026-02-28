@@ -80,3 +80,25 @@ export async function callLLM(messages: Array<{role: string; content: string}>):
     req.end();
   });
 }
+
+// v5 additions
+import OpenAI from 'openai';
+export async function callOpenAI(messages: any[], tools: any[]) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: messages as any,
+      tools: tools.length > 0 ? tools : undefined,
+      temperature: 0.2,
+    });
+    const message = response.choices[0].message;
+    return {
+      message: message,
+      toolCalls: message.tool_calls
+    };
+  } catch (error) {
+    console.error('[LLM] Error calling OpenAI API:', error);
+    throw error;
+  }
+}

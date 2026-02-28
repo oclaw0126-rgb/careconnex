@@ -49,3 +49,38 @@ export interface ScheduleInterviewResult {
   interviewId?: string;
   message: string;
 }
+
+// v5 Type Definitions
+export interface UserProfile {
+  userId: string;
+  name: string;
+  phone: string;
+  preferences: string[];
+  careRequirements: string[];
+  lastInteraction: string;
+}
+
+export interface ConversationMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  name?: string;
+  tool_call_id?: string; tool_calls?: any[];
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, any>; // JSON Schema
+}
+
+export interface ToolExecutor {
+  name: string;
+  execute: (args: any, context?: any) => Promise<any>;
+}
+
+export interface AgentState {
+  userId: string;
+  sessionId: string;
+  messages: ConversationMessage[];
+  iterationCount: number;
+}

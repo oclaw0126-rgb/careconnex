@@ -41,7 +41,7 @@ export async function executeTool(
 
 // ========== EXISTING TOOLS ==========
 
-async function toolSearchCaregivers(
+export async function toolSearchCaregivers(
   params: { zip_code: string; care_type?: string },
   context: { userId: string; userPhone: string }
 ): Promise<any> {
@@ -100,7 +100,7 @@ async function toolSearchCaregivers(
   }
 }
 
-async function toolScheduleInterview(
+export async function toolScheduleInterview(
   params: { caregiver_id: string; caregiver_name: string; proposed_time: string },
   context: { userId: string; userPhone: string }
 ): Promise<any> {
@@ -158,7 +158,7 @@ Cara - CareConnex Care Coordinator`
   }
 }
 
-async function toolStoreMemory(
+export async function toolStoreMemory(
   params: { key: string; value: string },
   context: { userId: string; userPhone: string }
 ): Promise<{ success: boolean }> {
@@ -183,7 +183,7 @@ async function toolStoreMemory(
   }
 }
 
-async function toolRequestHuman(
+export async function toolRequestHuman(
   params: { reason: string },
   context: { userId: string; userPhone: string }
 ): Promise<{ success: boolean; message: string }> {
@@ -230,7 +230,7 @@ interface EmailPayload {
   body: string;
 }
 
-async function toolSendEmail(
+export async function toolSendEmail(
   params: EmailPayload,
   context: { userId: string; userPhone: string }
 ): Promise<{ success: boolean; message: string }> {
@@ -304,7 +304,7 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
   });
 }
 
-async function toolSendSMS(
+export async function toolSendSMS(
   params: { to: string; message: string },
   context: { userId: string; userPhone: string }
 ): Promise<{ success: boolean; message: string }> {
@@ -315,7 +315,7 @@ async function toolSendSMS(
     const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
     const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
     
-    if (!TWILIO_SID || !TWILIO_TOKEN) {
+    if (!TWILIO_SID || !TWILIO_TOKEN || !TWILIO_NUMBER) {
       throw new Error('Twilio credentials not configured');
     }
     
@@ -375,7 +375,7 @@ async function toolSendSMS(
   }
 }
 
-async function toolBookCalendar(
+export async function toolBookCalendar(
   params: { title: string; date: string; time: string; attendees: string[] },
   context: { userId: string; userPhone: string }
 ): Promise<{ success: boolean; message: string; eventLink?: string }> {

@@ -58,7 +58,7 @@ Think of yourself as a helpful friend who happens to know about senior care.`
     logger.info('[Cara] LLM response', { response: llmResponse.substring(0, 200) });
     
     // STEP 2: Check if user explicitly wants us to take action
-    const intent = detectUserIntent(userMessage, llmResponse);
+    const intent = detectUserIntent(userMessage, llmResponse, session.memory);
     
     if (intent.shouldUseTool && intent.toolName) {
       logger.info('[Cara] User wants action:', { tool: intent.toolName });
@@ -150,7 +150,7 @@ Your natural response:`;
 }
 
 // Detect if user wants us to take action
-function detectUserIntent(userMessage: string, llmResponse: string): {
+function detectUserIntent(userMessage: string, llmResponse: string, memory: Record<string, any> = {}): {
   shouldUseTool: boolean;
   toolName?: string;
   parameters?: any;
@@ -171,7 +171,7 @@ function detectUserIntent(userMessage: string, llmResponse: string): {
   ) {
     // Extract zip if mentioned
     const zipMatch = msg.match(/\b\d{5}\b/);
-    const zipCode = zipMatch ? zipMatch[0] : session.memory['zip_code'];
+    const zipCode = zipMatch ? zipMatch[0] : memory['zip_code'];
     
     if (zipCode) {
       return {
