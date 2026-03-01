@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, Loader2, Star, MapPin, DollarSign, ShieldCheck, Check, Calendar, Clock } from 'lucide-react';
+import { X, ChevronRight, Loader2, Star, MapPin, DollarSign, ShieldCheck, Check, Calendar, Clock, Video } from 'lucide-react';
 import { Caregiver, Senior } from '../types';
 import { matchService } from '../services/matchService';
 
@@ -8,6 +8,8 @@ interface SimpleSearchWizardProps {
     onClose: () => void;
     caregivers: Caregiver[];
     onSelectCaregiver: (caregiver: Caregiver) => void;
+    onViewProfile?: (caregiver: Caregiver) => void;
+    onScheduleInterview?: (caregiver: Caregiver) => void;
     seniorProfile?: Senior;
 }
 
@@ -42,6 +44,8 @@ export const SimpleSearchWizard: React.FC<SimpleSearchWizardProps> = ({
     onClose,
     caregivers,
     onSelectCaregiver,
+    onViewProfile,
+    onScheduleInterview,
     seniorProfile
 }) => {
     const [step, setStep] = useState(1);
@@ -495,16 +499,37 @@ export const SimpleSearchWizard: React.FC<SimpleSearchWizardProps> = ({
                                                         </div>
                                                     )}
 
-                                                    <button
-                                                        onClick={() => {
-                                                            onSelectCaregiver(caregiver);
-                                                            onClose();
-                                                        }}
-                                                        className="w-full py-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl font-bold text-xl hover:from-teal-700 hover:to-blue-700 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        Book Now
-                                                        <ChevronRight className="w-6 h-6" />
-                                                    </button>
+                                                    {/* Action Buttons */}
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                onSelectCaregiver(caregiver);
+                                                                setTimeout(() => onClose(), 100);
+                                                            }}
+                                                            className="py-3 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl font-bold text-base hover:from-teal-700 hover:to-blue-700 transition-all flex items-center justify-center gap-1"
+                                                        >
+                                                            Book
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                onViewProfile?.(caregiver);
+                                                                setTimeout(() => onClose(), 100);
+                                                            }}
+                                                            className="py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-base hover:bg-slate-200 transition-all"
+                                                        >
+                                                            Profile
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                onScheduleInterview?.(caregiver);
+                                                                setTimeout(() => onClose(), 100);
+                                                            }}
+                                                            className="py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-base hover:bg-purple-200 transition-all flex items-center justify-center gap-1"
+                                                        >
+                                                            <Video className="w-4 h-4" />
+                                                            Call
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

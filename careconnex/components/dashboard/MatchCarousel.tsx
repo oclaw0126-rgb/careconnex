@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Loader2, MessageSquare, ShieldCheck, Star } from 'lucide-react';
+import { Sparkles, Loader2, MessageSquare, ShieldCheck, Star, Video } from 'lucide-react';
 import { Caregiver } from '../../types';
 import { Button } from '../ui/Button';
 import { StaggerContainer, MotionItem } from '../ui/Motion';
@@ -10,6 +10,7 @@ interface MatchCarouselProps {
     loading: boolean;
     onChat: (caregiver: Caregiver) => void;
     onHire: (caregiver: Caregiver) => void;
+    onScheduleInterview?: (caregiver: Caregiver) => void;
     onSeeAll: () => void;
     creatingThreadId: string | number | null;
 }
@@ -50,6 +51,7 @@ export const MatchCarousel: React.FC<MatchCarouselProps> = ({
     loading,
     onChat,
     onHire,
+    onScheduleInterview,
     onSeeAll,
     creatingThreadId
 }) => {
@@ -133,7 +135,7 @@ export const MatchCarousel: React.FC<MatchCarouselProps> = ({
                                 </div>
                             )}
 
-                            <div className="mt-auto grid grid-cols-2 gap-2">
+                            <div className="mt-auto grid grid-cols-3 gap-2">
                                 <Button
                                     variant="secondary"
                                     size="sm"
@@ -147,9 +149,18 @@ export const MatchCarousel: React.FC<MatchCarouselProps> = ({
                                 </Button>
                                 <Button
                                     size="sm"
+                                    variant="outline"
                                     onClick={() => onHire(caregiver)}
                                 >
-                                    View Profile
+                                    Profile
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
+                                    onClick={() => onScheduleInterview?.(caregiver)}
+                                >
+                                    <Video className="w-4 h-4" />
                                 </Button>
                             </div>
                         </MotionItem>

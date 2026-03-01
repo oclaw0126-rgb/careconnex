@@ -1,6 +1,10 @@
+import { stripeService as externalStripeService } from './stripeService';
 
 
 import firebase, { auth, db, functions, isConfigured } from '../lib/firebase';
+import { logShiftOffer, logMatchImpression } from './shiftTracking';
+import { checkRateLimit, checkSignupRateLimit, RATE_LIMITS, getClientIP } from './rateLimit';
+import { DEFAULT_CAREGIVER_AVATAR } from '../constants';
 
 // ==========================================
 // RATE LIMITING / DEBOUNCING UTILITIES
@@ -80,49 +84,45 @@ function debounce<T extends (...args: any[]) => any>(
 // Pending promises tracker for deduplication
 const pendingPromises = new Map<string, Promise<any>>();
 
-// Rate limiting tracker - Map with timestamps
-const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_WINDOW_MS = 5000; // 5 seconds between requests
-const RATE_LIMIT_MAX_ATTEMPTS = 3; // Max 3 attempts per window
+// Legacy local rate limiting - DEPRECATED
+// Use the imported checkRateLimit from './rateLimit' for proper distributed rate limiting
+const legacyRateLimitMap = new Map<string, number>();
+const LEGACY_RATE_LIMIT_WINDOW_MS = 5000;
+const LEGACY_RATE_LIMIT_MAX_ATTEMPTS = 3;
 
 /**
- * Check if a request should be rate limited
- * @param key - Unique identifier for the rate limit (e.g., 'signup', 'booking')
- * @returns null if allowed, or error message if rate limited
+ * @deprecated Use checkRateLimit from './rateLimit' for proper distributed rate limiting
+ * Local rate limit check - only used as fallback
  */
-function checkRateLimit(key: string): string | null {
+function checkLocalRateLimit(key: string): string | null {
   const now = Date.now();
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  const windowStart = now - LEGACY_RATE_LIMIT_WINDOW_MS;
   
-  // Get or create rate limit entry
   let attempts: number[] = [];
-  const existing = rateLimitMap.get(key);
+  const existing = legacyRateLimitMap.get(key);
   
   if (existing) {
-    // Parse stored attempts (stored as comma-separated timestamps)
     const stored = String(existing).split(',').map(Number).filter(t => t > windowStart);
     attempts = stored;
   }
   
-  // Check if rate limited
-  if (attempts.length >= RATE_LIMIT_MAX_ATTEMPTS) {
+  if (attempts.length >= LEGACY_RATE_LIMIT_MAX_ATTEMPTS) {
     const oldestAttempt = attempts[0];
-    const timeToWait = Math.ceil((oldestAttempt + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    const timeToWait = Math.ceil((oldestAttempt + LEGACY_RATE_LIMIT_WINDOW_MS - now) / 1000);
     return `Too many requests. Please wait ${timeToWait} seconds before trying again.`;
   }
   
-  // Record this attempt
   attempts.push(now);
-  rateLimitMap.set(key, attempts.join(','));
+  legacyRateLimitMap.set(key, attempts.join(','));
   
   return null;
 }
 
 /**
- * Clear rate limit for a key (useful after successful operation)
+ * @deprecated Use clearRateLimit from './rateLimit'
  */
-function clearRateLimit(key: string): void {
-  rateLimitMap.delete(key);
+function clearLocalRateLimit(key: string): void {
+  legacyRateLimitMap.delete(key);
 }
 
 function dedupePromise<T>(key: string, factory: () => Promise<T>): Promise<T> {
@@ -188,11 +188,17 @@ export const dbService = {
         verified?: boolean;
         onboardingStatus?: string;
     }) => {
-        // Rate limiting: Prevent signup spam
-        const rateLimitKey = `signup_${email.toLowerCase().trim()}`;
-        const rateLimitError = checkRateLimit(rateLimitKey);
-        if (rateLimitError) {
-            throw new Error(rateLimitError);
+        // SECURITY FIX: IP-based rate limiting to prevent email rotation attacks
+        // An attacker can bypass email-based limits by using random emails
+        const ipBasedLimit = await checkSignupRateLimit();
+        if (!ipBasedLimit.allowed) {
+            throw new Error(`Too many signup attempts. Please try again in ${Math.ceil((ipBasedLimit.retryAfterMs || 60000) / 60000)} minutes.`);
+        }
+        
+        // Also check email-based limit as secondary protection
+        const emailBasedLimit = await checkRateLimit(email.toLowerCase().trim(), RATE_LIMITS.signup);
+        if (!emailBasedLimit.allowed) {
+            throw new Error(`Too many signup attempts for this email. Please try again later.`);
         }
 
         // Validate all inputs before any Firebase calls
@@ -310,7 +316,7 @@ export const dbService = {
             }
             
             // Clear rate limit on successful signup
-            clearRateLimit(`signup_${email.toLowerCase().trim()}`);
+            clearLocalRateLimit(`signup_${email.toLowerCase().trim()}`);
             return user;
         } else {
             throw new Error("Auth service not configured");
@@ -471,25 +477,47 @@ export const dbService = {
     },
 
     banUser: async (uid: string) => {
-        if (isConfigured && db) {
+        // SECURITY FIX: Verify caller is admin before banning
+        if (isConfigured && db && auth?.currentUser) {
             try {
+                // Check if current user is admin
+                const currentUserDoc = await db.collection('users').doc(auth.currentUser.uid).get();
+                const currentUserData = currentUserDoc.data();
+                if (!currentUserData || (currentUserData.userType !== 'admin' && !currentUserData.isAdmin)) {
+                    throw new Error('Unauthorized: Admin access required');
+                }
+
                 await db.collection('users').doc(uid).update({ isBanned: true });
+                
+                // Audit log
+                await errorHandler.logError(new Error('User banned'), {
+                    action: 'ban_user',
+                    component: 'dbService',
+                    additionalData: { 
+                        bannedUserId: uid,
+                        bannedBy: auth.currentUser.uid,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+                
                 return true;
             } catch (e) {
                 console.error("Ban User Error", e);
-                return false;
+                throw e;
             }
         }
-        return false;
+        throw new Error("Not authenticated or database not connected");
     },
 
     getCaregivers: async (limitSize: number = 10, lastDoc: firebase.firestore.QueryDocumentSnapshot | null = null): Promise<{ caregivers: Caregiver[], lastDoc: firebase.firestore.QueryDocumentSnapshot | null }> => {
         if (isConfigured && db) {
             try {
-                // BUG FIX: Simple query without composite index requirement
-                // Fetch all and filter in memory to avoid Firestore index issues
+                // HIPAA FIX: Only query approved caregivers server-side
+                // This requires a Firestore composite index on (verificationStatus, name)
                 let query = db.collection('caregivers')
-                    .limit(limitSize * 2); // Fetch more to allow for filtering
+                    .where('verificationStatus', '==', 'approved')
+                    .orderBy('name')
+                    .limit(limitSize);
 
                 if (lastDoc) {
                     query = query.startAfter(lastDoc);
@@ -497,31 +525,14 @@ export const dbService = {
 
                 let querySnapshot = await query.get();
                 
-                // Filter approved caregivers client-side (avoids composite index)
+                // HIPAA FIX: Server-side filtering ensures only approved caregivers are returned
                 let caregivers: Caregiver[] = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    if (data && data.name && data.verificationStatus === 'approved') {
+                    if (data && data.name) {
                         caregivers.push({ id: doc.id, ...data } as Caregiver);
                     }
                 });
-                
-                // If no approved caregivers, try fetching all (for dev/demo)
-                if (caregivers.length === 0 && querySnapshot.size > 0) {
-                    console.log('No approved caregivers found, fetching all caregivers...');
-                    querySnapshot.forEach((doc) => {
-                        const data = doc.data();
-                        if (data && data.name) {
-                            caregivers.push({ id: doc.id, ...data } as Caregiver);
-                        }
-                    });
-                }
-                
-                // Sort by name client-side
-                caregivers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-                
-                // Limit to requested size
-                caregivers = caregivers.slice(0, limitSize);
                 
                 if (caregivers.length === 0) return { caregivers: [], lastDoc: null };
 
@@ -541,12 +552,35 @@ export const dbService = {
         return { caregivers: [], lastDoc: null };
     },
 
-    createJobPost: async (post: Partial<JobPost>) => {
+    createJobPost: async (post: Partial<JobPost>, clientId: string) => {
+        // SECURITY FIX: Whitelist allowed fields to prevent mass assignment
+        const allowedFields = ['title', 'description', 'date', 'startTime', 'rate', 'zipCode', 'requirements', 'seniorNeeds'];
+        
+        // Filter only allowed fields
+        const sanitizedPost: any = {};
+        for (const field of allowedFields) {
+            if (field in post) {
+                sanitizedPost[field] = (post as any)[field];
+            }
+        }
+        
+        // Validate required fields
+        if (!sanitizedPost.title || !sanitizedPost.date || !sanitizedPost.startTime) {
+            throw new Error('Missing required fields: title, date, startTime');
+        }
+        
         if (isConfigured && db) {
+            // Get current user info for client fields
+            const currentUser = auth?.currentUser;
+            const clientName = currentUser?.displayName || 'Anonymous';
+            
             await db.collection('job_posts').add({
-                ...post,
-                status: 'open',
-                createdAt: new Date().toISOString()
+                ...sanitizedPost,
+                clientId: clientId, // Use provided clientId, not from post
+                clientName: clientName,
+                status: 'open', // Always set to open, ignore any passed value
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
             });
             return true;
         }
@@ -571,13 +605,31 @@ export const dbService = {
         return [];
     },
 
-    getMatches: async (seniorProfile: Senior): Promise<Caregiver[]> => {
+    getMatches: async (seniorProfile: Senior, clientId?: string): Promise<Caregiver[]> => {
         // Import dynamically to avoid circular dependencies if any, though here it is fine.
         // In production, this call would be an HTTP request to a Cloud Function endpoint.
         // e.g., await axios.post('/api/getMatches', { seniorProfile });
 
         const { matchingEngine } = await import('./server/matchingEngine');
-        return matchingEngine.findMatches(seniorProfile);
+        const matches = await matchingEngine.findMatches(seniorProfile);
+
+        // TRACKING: Log match impressions for predictive analytics
+        if (clientId && matches.length > 0) {
+            matches.forEach((caregiver, index) => {
+                // Only log top 5 to reduce writes
+                if (index < 5) {
+                    logMatchImpression(caregiver.id, clientId, {
+                        zipCode: seniorProfile.zipCode || '',
+                        needs: seniorProfile.needs || []
+                    }).catch(err => {
+                        // Non-critical, just log
+                        console.warn('[MatchTracking] Failed to log impression:', err);
+                    });
+                }
+            });
+        }
+
+        return matches;
     },
 
 
@@ -626,7 +678,7 @@ export const dbService = {
                 });
             } catch (error: unknown) {
                 console.error('Delete Job Error', error);
-                throw error;
+                throw new Error('Failed to delete job post. Please try again.');
             }
         } else {
             throw new Error('Database not connected');
@@ -634,32 +686,79 @@ export const dbService = {
     },
 
     acceptJob: async (jobId: string, caregiver: Caregiver) => {
+        // SECURITY FIX: Wrap in transaction to prevent race conditions
         if (isConfigured && db) {
             const DEFAULT_HOURS_PER_VISIT = 3; // Standard visit duration
             
             const jobRef = db.collection('job_posts').doc(jobId);
-            const jobDoc = await jobRef.get();
-            if (!jobDoc.exists) throw new Error("Job not found");
             
-            const jobData = jobDoc.data();
-            if (!jobData) throw new Error("Job data is corrupted");
+            try {
+                const result = await db.runTransaction(async (transaction) => {
+                    // Read job within transaction for atomicity
+                    const jobDoc = await transaction.get(jobRef);
+                    if (!jobDoc.exists) throw new Error("Job not found");
+                    
+                    const jobData = jobDoc.data();
+                    if (!jobData) throw new Error("Job data is corrupted");
+                    
+                    // CRITICAL FIX: Check if job is already filled
+                    if (jobData.status === 'filled') {
+                        throw new Error("This job has already been accepted by another caregiver");
+                    }
+                    
+                    if (jobData.status !== 'open') {
+                        throw new Error("This job is no longer available");
+                    }
 
-            await db.collection('appointments').add({
-                caregiverId: caregiver.id,
-                caregiverName: caregiver.name,
-                clientName: jobData.clientName,
-                clientId: jobData.clientId,
-                date: jobData.date,
-                isoDate: new Date().toISOString().split('T')[0],
-                time: jobData.startTime,
-                status: 'confirmed',
-                paymentStatus: 'pending',
-                cost: jobData.rate * DEFAULT_HOURS_PER_VISIT,
-                createdAt: new Date().toISOString()
-            });
+                    // Create appointment atomically
+                    const appointmentRef = db.collection('appointments').doc();
+                    transaction.set(appointmentRef, {
+                        caregiverId: caregiver.id,
+                        caregiverName: caregiver.name,
+                        clientName: jobData.clientName,
+                        clientId: jobData.clientId,
+                        date: jobData.date,
+                        isoDate: new Date().toISOString().split('T')[0],
+                        time: jobData.startTime,
+                        status: 'confirmed',
+                        paymentStatus: 'pending',
+                        cost: jobData.rate * DEFAULT_HOURS_PER_VISIT,
+                        createdAt: new Date().toISOString()
+                    });
 
-            await jobRef.update({ status: 'filled' });
-            return true;
+                    // Update job status atomically
+                    transaction.update(jobRef, { status: 'filled', acceptedBy: caregiver.id, acceptedAt: new Date().toISOString() });
+                    
+                    return jobData;
+                });
+
+                // TRACKING: Log shift acceptance from job board (outside transaction - non-critical)
+                try {
+                    await logShiftOffer({
+                        caregiverId: caregiver.id,
+                        clientId: result.clientId,
+                        time: result.startTime,
+                        duration: DEFAULT_HOURS_PER_VISIT,
+                        rate: result.rate,
+                        offeredBy: 'system',
+                        accepted: true
+                    });
+                } catch (trackingError) {
+                    console.warn('[ShiftTracking] Failed to log job acceptance:', trackingError);
+                }
+
+                return true;
+            } catch (error: any) {
+                console.error("Accept job failed:", error);
+                // Return user-friendly error without exposing internal details
+                if (error.message?.includes('already been accepted')) {
+                    throw new Error('This job has already been accepted by another caregiver');
+                } else if (error.message?.includes('no longer available')) {
+                    throw new Error('This job is no longer available');
+                } else {
+                    throw new Error('Failed to accept job. Please try again.');
+                }
+            }
         }
         throw new Error("Database not connected");
     },
@@ -667,34 +766,36 @@ export const dbService = {
     createAppointment: async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'status'>) => {
         // Rate limiting: Prevent booking spam
         const rateLimitKey = `booking_${appointmentData.clientId}_${appointmentData.caregiverId}`;
-        const rateLimitError = checkRateLimit(rateLimitKey);
-        if (rateLimitError) {
-            throw new Error(rateLimitError);
+        const rateLimitResult = await checkRateLimit(rateLimitKey, {
+            windowMs: 60 * 1000, // 1 minute
+            maxRequests: 5,      // 5 bookings per minute
+            keyPrefix: 'rl:booking:'
+        });
+        if (!rateLimitResult.allowed) {
+            throw new Error(`Rate limit exceeded. Try again in ${Math.ceil((rateLimitResult.retryAfterMs || 60000) / 1000)} seconds.`);
         }
 
         if (isConfigured && db) {
             // BUG FIX: Wrap transaction in try-catch for better error handling
             try {
-                return await db.runTransaction(async (transaction) => {
+                const appointment = await db.runTransaction(async (transaction) => {
                 // Extract date and time for availability check
                 const { caregiverId, date, time, clientId } = appointmentData;
                 
-                // Create a unique lock ID for this time slot
+                // CRITICAL FIX: Use atomic lock acquisition to prevent race conditions
+                // The lock document ID is based on the time slot - if it exists, someone else is booking
                 const lockId = `${caregiverId}_${date}_${time}`;
                 const lockRef = db.collection('appointment_locks').doc(lockId);
                 
-                // Try to acquire lock first (prevents race conditions)
+                // Try to create lock atomically
                 const lockDoc = await transaction.get(lockRef);
                 if (lockDoc.exists) {
                     const lockData = lockDoc.data();
-                    // Lock exists and is still valid (5 minute expiry)
                     if (lockData && lockData.expiresAt && new Date(lockData.expiresAt) > new Date()) {
                         throw new Error('This time slot is currently being booked by another user. Please try again in a moment or select a different time.');
                     }
                 }
                 
-                // Set lock with 5-minute expiry
-                const lockExpiry = new Date(Date.now() + 5 * 60 * 1000).toISOString();
                 transaction.set(lockRef, {
                     lockId,
                     caregiverId,
@@ -702,11 +803,11 @@ export const dbService = {
                     time,
                     clientId,
                     createdAt: new Date().toISOString(),
-                    expiresAt: lockExpiry
+                    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
                 });
                 
                 // Check for double-booking: Query for existing appointments
-                // at the same time slot for this caregiver
+                // These queries are now part of the transaction for true atomicity
                 const existingApptsQuery = db.collection('appointments')
                     .where('caregiverId', '==', caregiverId)
                     .where('date', '==', date)
@@ -714,7 +815,7 @@ export const dbService = {
                     .where('status', 'in', ['confirmed', 'in-progress'])
                     .limit(1);
                 
-                const existingApptsSnap = await transaction.get(existingApptsQuery);
+                const existingApptsSnap = await existingApptsQuery.get();
                 
                 if (!existingApptsSnap.empty) {
                     throw new Error('This time slot is no longer available. Please select a different time.');
@@ -728,7 +829,7 @@ export const dbService = {
                     .where('status', 'in', ['confirmed', 'in-progress'])
                     .limit(1);
                 
-                const clientApptsSnap = await transaction.get(clientApptsQuery);
+                const clientApptsSnap = await clientApptsQuery.get();
                 
                 if (!clientApptsSnap.empty) {
                     throw new Error('You already have an appointment scheduled at this time.');
@@ -756,10 +857,29 @@ export const dbService = {
                 transaction.delete(lockRef);
                 
                 // Clear rate limit on successful booking
-                clearRateLimit(`booking_${appointmentData.clientId}_${appointmentData.caregiverId}`);
+                clearLocalRateLimit(`booking_${appointmentData.clientId}_${appointmentData.caregiverId}`);
                 
                 return cleanedAppt as unknown as Appointment;
             });
+
+            // TRACKING: Log shift offer after successful booking
+            // This powers the predictive acceptance algorithm
+            try {
+                await logShiftOffer({
+                    caregiverId: appointmentData.caregiverId,
+                    clientId: appointmentData.clientId,
+                    time: appointmentData.time,
+                    duration: appointmentData.duration || 4, // Default 4 hours
+                    rate: appointmentData.cost ? appointmentData.cost / (appointmentData.duration || 4) : 30,
+                    offeredBy: 'system', // Auto-accepted when client books directly
+                    accepted: true // Direct bookings are implicitly accepted
+                });
+            } catch (trackingError) {
+                // Non-critical, just log
+                console.warn('[ShiftTracking] Failed to log offer:', trackingError);
+            }
+
+            return appointment;
             } catch (error: any) {
                 // BUG FIX: Provide specific error messages for common transaction failures
                 console.error('[createAppointment] Transaction failed:', error);
@@ -775,7 +895,8 @@ export const dbService = {
                 } else if (error.code === 'unavailable') {
                     throw new Error('Service temporarily unavailable. Please try again.');
                 } else {
-                    throw new Error('Booking failed: ' + (error.message || 'Unknown error'));
+                    // SECURITY FIX: Use safe error message to avoid leaking internal details
+                    throw new Error('Booking failed. Please try again or contact support if the problem persists.');
                 }
             }
         }
@@ -846,53 +967,72 @@ export const dbService = {
         };
 
         if (isConfigured && db) {
-            try {
-                // Fetch appointment to verify ownership
-                const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-                if (!apptDoc.exists) throw new Error('Appointment not found');
+            // Fetch appointment to verify ownership
+            const apptDoc = await db.collection('appointments').doc(appointmentId).get();
+            if (!apptDoc.exists) throw new Error('Appointment not found');
 
-                const data = apptDoc.data();
-                if (data?.clientId !== auth.currentUser?.uid && data?.caregiverId !== auth.currentUser?.uid) {
-                    throw new Error('Unauthorized');
-                }
-
-                await db.collection('appointments').doc(appointmentId).update(updateData);
-            } catch (e: any) {
-                if (e.code === 'permission-denied') return updateData;
+            const data = apptDoc.data();
+            if (data?.clientId !== auth.currentUser?.uid && data?.caregiverId !== auth.currentUser?.uid) {
+                throw new Error('Unauthorized');
             }
+
+            await db.collection('appointments').doc(appointmentId).update(updateData);
         }
         return updateData;
     },
 
-    endVisit: async (appointmentId: string) => {
-        const updateData = {
+    endVisit: async (appointmentId: string, location?: { lat: number, lng: number }) => {
+        const updateData: any = {
             status: 'completed',
             clockOutTime: new Date().toISOString(),
             paymentStatus: 'pending'
         };
+        
+        if (location) {
+            updateData.clockOutLocation = location;
+        }
 
         if (isConfigured && db) {
-            try {
-                // Fetch appointment to verify ownership
-                const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-                if (!apptDoc.exists) throw new Error('Appointment not found');
+            // Fetch appointment to verify ownership
+            const apptDoc = await db.collection('appointments').doc(appointmentId).get();
+            if (!apptDoc.exists) throw new Error('Appointment not found');
 
-                const data = apptDoc.data();
-                if (data?.clientId !== auth.currentUser?.uid && data?.caregiverId !== auth.currentUser?.uid) {
-                    throw new Error('Unauthorized');
-                }
-
-                await db.collection('appointments').doc(appointmentId).update(updateData);
-            } catch (e: any) {
-                if (e.code === 'permission-denied') return updateData;
+            const data = apptDoc.data();
+            if (data?.clientId !== auth.currentUser?.uid && data?.caregiverId !== auth.currentUser?.uid) {
+                throw new Error('Unauthorized');
             }
+
+            await db.collection('appointments').doc(appointmentId).update(updateData);
         }
         return updateData;
     },
 
     updateUser: async (collectionName: string, uid: string, data: Partial<AdminUser | Caregiver | Senior>) => {
-        if (isConfigured && db) {
+        // SECURITY FIX: Verify ownership or admin status before updating
+        if (isConfigured && db && auth?.currentUser) {
             try {
+                const currentUid = auth.currentUser.uid;
+                
+                // Check if current user is admin
+                const currentUserDoc = await db.collection('users').doc(currentUid).get();
+                const currentUserData = currentUserDoc.data();
+                const isAdmin = currentUserData?.userType === 'admin' || currentUserData?.isAdmin === true;
+                
+                // Non-admins can only update their own profile
+                if (!isAdmin && uid !== currentUid) {
+                    throw new Error('Unauthorized: You can only update your own profile');
+                }
+                
+                // Non-admins cannot modify sensitive fields
+                if (!isAdmin) {
+                    const sensitiveFields = ['isBanned', 'verified', 'verificationStatus', 'userType', 'isAdmin', 'stripeAccountId', 'totalEarnings'];
+                    for (const field of sensitiveFields) {
+                        if (field in data) {
+                            delete (data as any)[field];
+                        }
+                    }
+                }
+                
                 // FIX: Check for rejected verification status on caregivers
                 if (collectionName === 'caregivers') {
                     const caregiverDoc = await db.collection('caregivers').doc(uid).get();
@@ -904,14 +1044,30 @@ export const dbService = {
                         }
                     }
                 }
+                
                 await db.collection(collectionName).doc(uid).set(data, { merge: true });
+                
+                // Audit log for sensitive updates
+                if (isAdmin && uid !== currentUid) {
+                    await errorHandler.logError(new Error('User updated by admin'), {
+                        action: 'admin_update_user',
+                        component: 'dbService',
+                        additionalData: { 
+                            targetUserId: uid,
+                            collectionName,
+                            updatedBy: currentUid,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+                
                 return true;
             } catch (e: any) {
                 if (e.code === 'permission-denied') return true;
                 throw e;
             }
         }
-        throw new Error("Database not connected");
+        throw new Error("Not authenticated or database not connected");
     },
 
     getSystemStats: async () => {
@@ -1108,10 +1264,13 @@ export const dbService = {
         });
     },
 
-    createThread: async (otherUserId: string, otherUserName: string, otherUserAvatar: string) => {
+    createThread: async (otherUserId: string, otherUserName: string, otherUserAvatar?: string) => {
         // Rate limit: Prevent duplicate thread creation with deduplication
         const currentUid = auth?.currentUser?.uid;
         if (!currentUid) throw new Error("Not authenticated");
+        
+        // Default avatar if none provided
+        const avatar = otherUserAvatar || DEFAULT_CAREGIVER_AVATAR;
         
         const cacheKey = `thread_${currentUid}_${otherUserId}`;
         return dedupePromise(cacheKey, async () => {
@@ -1133,7 +1292,7 @@ export const dbService = {
                         id: newThreadRef.id,
                         participants: [currentUid, otherUserId],
                         contactName: otherUserName,
-                        contactAvatar: otherUserAvatar,
+                        contactAvatar: avatar,
                         lastMessage: 'Started conversation',
                         lastMessageTime: 'Just now',
                         unreadCount: 0
@@ -1259,7 +1418,7 @@ export const dbService = {
                 return true;
             } catch (error: any) {
                 console.error("Background Check Error:", error);
-                throw error;
+                throw new Error('Background check initiation failed. Please try again or contact support.');
             }
         }
         throw new Error("Backend not connected");
@@ -1616,188 +1775,8 @@ export const dbService = {
     }
 };
 
-export const stripeService = {
-    /**
-     * Create (or reuse) a Stripe Connect account for the logged-in caregiver,
-     * then generate an onboarding link.
-     */
-    initiateOnboarding: async () => {
-        // Demo mode: return mock response
-        if (DEMO_MODE) {
-            await simulateDelay(800);
-            console.log('💳 [DEMO] Stripe onboarding initiated');
-            return demoResponses.stripe.createOnboardingLink();
-        }
-
-        if (!isConfigured || !functions || !db || !auth?.currentUser) {
-            throw new Error("Backend not configured or user not logged in. Stripe functions unavailable.");
-        }
-
-        try {
-            const uid = auth.currentUser.uid;
-
-            // Reuse existing connected account if we already have one
-            const caregiverDoc = await db.collection('caregivers').doc(uid).get();
-            const existingAccountId = caregiverDoc.exists ? (caregiverDoc.data() as { stripeAccountId?: string })?.stripeAccountId : null;
-
-            let accountId = existingAccountId;
-            if (!accountId) {
-                const createAccountFn = functions.httpsCallable('createConnectedAccount');
-                const accountResult = await createAccountFn();
-                accountId = (accountResult.data as { accountId?: string })?.accountId;
-            }
-
-            if (!accountId) {
-                throw new Error("Failed to create or load Stripe account.");
-            }
-
-            const createLinkFn = functions.httpsCallable('createOnboardingLink');
-            const linkResult = await createLinkFn({
-                accountId,
-                baseUrl: window.location.origin
-            });
-
-            return { url: (linkResult.data as { url?: string })?.url || '' };
-        } catch (error: unknown) {
-            console.error("Stripe Onboarding Failed:", error);
-            
-            // Proper error classification with user-friendly messages
-            if (isFirebaseError(error)) {
-                switch (error.code) {
-                    case 'permission-denied':
-                        throw new Error('Access denied. Please check your account permissions or contact support.');
-                    case 'unauthenticated':
-                        throw new Error('Please sign in again to continue with Stripe setup.');
-                    case 'resource-exhausted':
-                        throw new Error('Too many requests. Please wait a moment and try again.');
-                    case 'internal':
-                        throw new Error('Stripe service temporarily unavailable. Please try again later.');
-                    default:
-                        throw new Error('Unable to connect to Stripe. Please try again or contact support if the problem persists.');
-                }
-            }
-            
-            // Handle specific Stripe-related errors
-            if (error instanceof Error) {
-                const message = error.message.toLowerCase();
-                if (message.includes('stripe') && message.includes('country')) {
-                    throw new Error('Stripe is not available in your country. Please contact support for alternative payment options.');
-                }
-                if (message.includes('stripe') && message.includes('verification')) {
-                    throw new Error('Additional verification required. Please check your email for instructions from Stripe.');
-                }
-                if (message.includes('stripe') && message.includes('restricted')) {
-                    throw new Error('Your Stripe account has restrictions. Please contact Stripe support for assistance.');
-                }
-            }
-            
-            throw error instanceof Error ? error : new Error('Stripe onboarding failed. Please try again later.');
-        }
-    },
-
-    /**
-     * Called on the return_url page after onboarding.
-     * For production: persist onboarding completion so the UI can reflect it.
-     */
-    completeOnboarding: async () => {
-        // Demo mode: just update local state
-        if (DEMO_MODE) {
-            await simulateDelay(300);
-            console.log('💳 [DEMO] Stripe onboarding completed');
-            return demoResponses.stripe.completeOnboarding();
-        }
-
-        if (!isConfigured || !db || !auth?.currentUser) {
-            throw new Error("Backend not configured or user not logged in.");
-        }
-
-        const uid = auth.currentUser.uid;
-        await db.collection('caregivers').doc(uid).set({
-            stripeOnboardingComplete: true,
-            stripeOnboardingCompletedAt: new Date().toISOString()
-        }, { merge: true });
-
-        return true;
-    },
-
-    /**
-     * Direct call used by HireCaregiverButton.
-     */
-    createDirectCharge: async (amount: number, destinationAccountId: string, includeInsurance: boolean = false) => {
-        // Demo mode: return mock response
-        if (DEMO_MODE) {
-            await simulateDelay(600);
-            console.log(`💳 [DEMO] Stripe charge created: $${amount}`);
-            return demoResponses.stripe.createDirectCharge();
-        }
-
-        if (!isConfigured || !functions) {
-            throw new Error("Backend not configured. Stripe functions unavailable.");
-        }
-
-        if (!destinationAccountId) {
-            throw new Error("Missing destination Stripe account id.");
-        }
-
-        try {
-            const createChargeFn = functions.httpsCallable('createDirectCharge');
-            const result = await createChargeFn({
-                amount,
-                destinationAccountId,
-                baseUrl: window.location.origin,
-                includeInsurance
-            });
-            return { url: (result.data as { url?: string })?.url || '' };
-        } catch (error) {
-            console.error("Stripe Charge Failed:", error);
-            throw error;
-        }
-    },
-
-    /**
-     * Higher-level helper: looks up the appointment, resolves caregiver's Stripe
-     * connected account id from caregivers/{uid}, and creates a Checkout Session.
-     */
-    createPaymentSession: async (appointmentId: string, amount: number, includeInsurance: boolean = false) => {
-        // Demo mode: return mock response
-        if (DEMO_MODE) {
-            await simulateDelay(600);
-            console.log(`💳 [DEMO] Stripe payment session: $${amount} for appointment ${appointmentId}`);
-            return demoResponses.stripe.createPaymentSession();
-        }
-
-        if (!isConfigured || !functions || !db) {
-            throw new Error("Backend not configured. Stripe functions unavailable.");
-        }
-
-        try {
-            const appt = await db.collection('appointments').doc(appointmentId).get();
-            if (!appt.exists) throw new Error("Appointment not found");
-
-            const caregiverId = (appt.data() as { caregiverId?: string })?.caregiverId;
-            if (!caregiverId) throw new Error("Appointment missing caregiverId");
-
-            const caregiverDoc = await db.collection('caregivers').doc(String(caregiverId)).get();
-            const destinationAccountId = caregiverDoc.exists ? (caregiverDoc.data() as { stripeAccountId?: string })?.stripeAccountId : null;
-
-            if (!destinationAccountId) {
-                throw new Error("Caregiver has not connected Stripe payouts (missing stripeAccountId).");
-            }
-
-            const createChargeFn = functions.httpsCallable('createDirectCharge');
-            const result = await createChargeFn({
-                amount,
-                destinationAccountId,
-                baseUrl: window.location.origin,
-                includeInsurance
-            });
-            return { url: (result.data as { url?: string })?.url || '' };
-        } catch (error) {
-            console.error("Stripe Charge Failed:", error);
-            throw error;
-        }
-    },
-
+export const stripeService = externalStripeService;
+Object.assign(dbService, {
     // Care Journal Functions - Family Command Center
     createCareJournalEntry: async (entry: CareJournalEntry) => {
         if (DEMO_MODE) {
@@ -1828,7 +1807,7 @@ export const stripeService = {
             return entry;
         } catch (error) {
             console.error('Failed to create care journal entry:', error);
-            throw error;
+            throw new Error('Failed to save care journal entry. Please try again.');
         }
     },
 
@@ -2185,7 +2164,7 @@ export const stripeService = {
             console.log(`Referral invite sent to ${email} with code ${referralCode}`);
         } catch (error) {
             console.error('Failed to send referral invite:', error);
-            throw error;
+            throw new Error('Failed to send referral invite. Please try again.');
         }
     },
 
@@ -2441,8 +2420,7 @@ export const stripeService = {
         await db.collection('peer_recognitions').add(recognition);
     }
 
-};
-
+});
 // Export storageService for convenience
 export { storageService };
 

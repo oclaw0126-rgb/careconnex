@@ -64,6 +64,42 @@
     "self-improving-agent-1-0-2": {
       "version": "1.0.0",
       "installedAt": 1771091644237
+    },
+    "landing-page-roast": {
+      "version": "1.0.1",
+      "installedAt": 1771776973169
+    },
+    "seo": {
+      "version": "1.0.1",
+      "installedAt": 1771776977262
+    },
+    "afrexai-hipaa-compliance": {
+      "version": "1.0.0",
+      "installedAt": 1771776981575
+    },
+    "e2e-testing-patterns": {
+      "version": "1.0.0",
+      "installedAt": 1771776985353
+    },
+    "ddg-web-search": {
+      "version": "1.0.0",
+      "installedAt": 1771816864417
+    },
+    "coding": {
+      "version": "1.0.3",
+      "installedAt": 1771900593118
+    },
+    "developer": {
+      "version": "1.0.0",
+      "installedAt": 1771900608033
+    },
+    "architecture": {
+      "version": "1.0.0",
+      "installedAt": 1771900631373
+    },
+    "software-engineer": {
+      "version": "1.0.0",
+      "installedAt": 1771900661692
     }
   }
 }

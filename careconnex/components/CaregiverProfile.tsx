@@ -47,13 +47,13 @@ export const CaregiverProfile: React.FC<CaregiverProfileProps> = ({ onNavigate, 
       try {
         // 1. Fetch Profile
         let fetchedProfile: Caregiver | undefined;
-        const allCaregivers = await dbService.getCaregivers();
+        const { caregivers: allCaregivers } = await dbService.getCaregivers();
 
         if (currentUser) {
           fetchedProfile = allCaregivers.find(c => c.uid === currentUser.uid);
         }
 
-        if (!fetchedProfile) fetchedProfile = allCaregivers.find(c => c.id === CAREGIVER_ID);
+        if (!fetchedProfile) fetchedProfile = allCaregivers.find(c => c.id === String(CAREGIVER_ID));
 
         if (fetchedProfile) {
           setProfile(prev => ({
@@ -66,7 +66,7 @@ export const CaregiverProfile: React.FC<CaregiverProfileProps> = ({ onNavigate, 
         }
 
         // 2. Fetch Reviews
-        unsubscribeReviews = dbService.subscribeToReviews(CAREGIVER_ID, (fetchedReviews) => {
+        unsubscribeReviews = dbService.subscribeToReviews(String(CAREGIVER_ID), (fetchedReviews) => {
           setReviews(fetchedReviews);
         });
 

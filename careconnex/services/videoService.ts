@@ -90,7 +90,7 @@ export const videoService = {
 
             console.log('📝 [VideoService] Attempting to write to Firestore:', interviewData);
 
-            const docRef = await db.collection('videoInterviews').add(interviewData);
+            const docRef = await db.collection('video_interviews').add(interviewData);
 
             console.log('✅ [VideoService] Interview scheduled successfully! Doc ID:', docRef.id);
 
@@ -117,7 +117,7 @@ export const videoService = {
 
         try {
             const fieldName = userType === 'client' ? 'clientId' : 'caregiverId';
-            const snapshot = await db.collection('videoInterviews')
+            const snapshot = await db.collection('video_interviews')
                 .where(fieldName, '==', userId)
                 .orderBy('scheduledTime', 'desc')
                 .get();
@@ -139,7 +139,7 @@ export const videoService = {
         if (!db) return null;
 
         try {
-            const docSnap = await db.collection('videoInterviews').doc(interviewId).get();
+            const docSnap = await db.collection('video_interviews').doc(interviewId).get();
 
             if (docSnap.exists) {
                 return {
@@ -179,7 +179,7 @@ export const videoService = {
                 Object.assign(updateData, additionalData);
             }
 
-            await db.collection('videoInterviews').doc(interviewId).update(updateData);
+            await db.collection('video_interviews').doc(interviewId).update(updateData);
         } catch (error) {
             console.error('Error updating interview status:', error);
             throw error;
@@ -288,7 +288,7 @@ export const videoService = {
 
             console.log(`📡 Setting up interview listener for ${userType}: ${userId}`);
 
-            const unsubscribe = db.collection('videoInterviews')
+            const unsubscribe = db.collection('video_interviews')
                 .where(field, '==', userId)
                 .orderBy('scheduledTime', 'desc')
                 .onSnapshot((snapshot) => {

@@ -20,7 +20,8 @@ export type ViewType =
   | 'stripe-callback'
   | 'payment-success'
   | 'payment-cancel'
-  | 'insurance';
+  | 'insurance'
+  | 'express-booking';
 
 export interface Senior {
   id: number;
@@ -152,6 +153,7 @@ export interface Caregiver {
   isSmoker?: boolean;
   medicalSkills?: string[];
   reliabilityScore?: number;
+  retentionRate?: number;        // % of clients who rebook (0-100)
   matchReasoning?: string;
   matchFlags?: string[];
 
@@ -353,6 +355,7 @@ export interface DirectMessage {
 
 export interface Thread {
   id: string;
+  contactId: string;
   contactName: string;
   contactAvatar: string;
   lastMessage: string;

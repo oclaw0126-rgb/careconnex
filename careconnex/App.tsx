@@ -29,6 +29,11 @@ const NotFound = lazy(() => import('./components/NotFound').then(module => ({ de
 // Phase 1 Components
 const ExpressBooking = lazy(() => import('./components/ExpressBooking').then(module => ({ default: module.ExpressBooking })));
 
+// Video Interview & Profile Modals
+const ScheduleInterviewModal = lazy(() => import('./components/ScheduleInterviewModal').then(module => ({ default: module.ScheduleInterviewModal })));
+const CaregiverProfileModal = lazy(() => import('./components/CaregiverProfileModal').then(module => ({ default: module.CaregiverProfileModal })));
+const VideoInterviewRoom = lazy(() => import('./components/VideoInterviewRoom').then(module => ({ default: module.VideoInterviewRoom })));
+
 // Wrapper for landing view
 const LandingView = (props: any) => <LandingViewComponent {...props} />;
 
@@ -67,6 +72,11 @@ const AppContent: React.FC = () => {
   const { appointment: calloutAppointment } = useAppointmentForCallout(
     activeCallout?.data?.appointmentId || null
   );
+
+  // Video Interview State
+  const [scheduleInterviewCaregiver, setScheduleInterviewCaregiver] = useState<any>(null);
+  const [viewingCaregiver, setViewingCaregiver] = useState<any>(null);
+  const [activeInterview, setActiveInterview] = useState<any>(null);
 
   // Handle caregiver selection from callout modal
   const handleBackupCaregiverSelected = (caregiverId: string, caregiverName: string) => {
@@ -135,6 +145,7 @@ const AppContent: React.FC = () => {
       case 'payment-success': navigate('/payment/success'); break;
       case 'payment-cancel': navigate('/payment/cancel'); break;
       case 'insurance': navigate('/insurance'); break;
+      case 'express-booking': navigate('/book-now'); break;
       default: navigate('/');
     }
   };
@@ -198,11 +209,28 @@ const AppContent: React.FC = () => {
             />
           } />
           <Route path="/client/profile" element={<ClientProfile onNavigate={handleNavigation} onShowToast={addToast} />} />
-          <Route path="/client/inbox" element={<InboxView userType="client" onNavigate={handleNavigation} />} />
+          <Route path="/client/inbox" element={<InboxView 
+            userType="client" 
+            onNavigate={handleNavigation} 
+            onShowToast={addToast}
+            onScheduleVideoCall={(caregiverId, caregiverName) => {
+              // Find caregiver in list or create minimal object
+              setScheduleInterviewCaregiver({
+                id: caregiverId,
+                uid: caregiverId,
+                name: caregiverName,
+                hourlyRate: 25,
+                imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(caregiverName)}&background=random`
+              });
+            }}
+            onViewProfile={(caregiverId) => {
+              navigate(`/caregiver-profile?id=${caregiverId}`);
+            }}
+          />} />
 
           <Route path="/caregiver/dashboard" element={<CaregiverDashboard onNavigate={handleNavigation} />} />
           <Route path="/caregiver/profile" element={<CaregiverProfile onNavigate={handleNavigation} onShowToast={addToast} />} />
-          <Route path="/caregiver/inbox" element={<InboxView userType="caregiver" onNavigate={handleNavigation} />} />
+          <Route path="/caregiver/inbox" element={<InboxView userType="caregiver" onNavigate={handleNavigation} onShowToast={addToast} />} />
 
           <Route path="/client/care-plan" element={
             <CarePlan
@@ -227,13 +255,18 @@ const AppContent: React.FC = () => {
           <Route path="/insurance" element={<Insurance onNavigate={handleNavigation} />} />
 
           {/* Phase 1: Express Booking Route */}
-          <Route path="/book-now" element={
-            <ExpressBooking 
+          <Route path="/express-booking" element={
+            <ExpressBooking
               clientId={currentUser?.uid || ''}
               onBook={async (data) => {
-                addToast('Finding your perfect caregiver...', 'info');
-                // Navigate to client dashboard where AI matching will show results
-                navigate('/client/dashboard');
+                try {
+                  addToast('Finding your perfect caregiver...', 'info');
+                  // Navigate to client dashboard where AI matching will show results
+                  navigate('/client/dashboard');
+                } catch (error) {
+                  console.error('Express booking error:', error);
+                  addToast('Booking failed. Please try again.', 'error');
+                }
               }}
             />
           } />
@@ -251,56 +284,56 @@ const AppContent: React.FC = () => {
       )}
 
       {showBottomNav && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-md border border-[var(--color-neutral-200)] rounded-full shadow-2xl px-6 py-3 flex space-x-6 z-50">
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-md border border-[var(--color-neutral-200)] rounded-full shadow-2xl px-3 sm:px-6 py-2 sm:py-3 flex space-x-2 sm:space-x-6 z-50 safe-area-bottom">
           <button
             onClick={() => handleNavigation(isClientFlow ? 'client' : 'caregiver')}
-            className={`flex flex-col items-center transition-colors min-w-[3rem] ${path.endsWith('dashboard') || path === '/client' || path === '/caregiver' ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
+            className={`flex flex-col items-center justify-center transition-colors min-w-[48px] min-h-[48px] rounded-lg active:scale-95 ${path.endsWith('dashboard') || path === '/client' || path === '/caregiver' ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
               }`}
           >
-            <Home className="w-6 h-6" />
-            <span className="text-[10px] font-medium mt-1">Home</span>
+            <Home className="w-5 sm:w-6 h-5 sm:h-6" />
+            <span className="text-[10px] font-medium mt-0.5">Home</span>
           </button>
 
-          <div className="w-px bg-[var(--color-neutral-200)] h-full"></div>
+          <div className="w-px bg-[var(--color-neutral-200)] h-8 self-center hidden sm:block"></div>
 
           {/* Care Plan Tab (Client Only) */}
           {isClientFlow && (
             <>
               <button
                 onClick={() => handleNavigation('care-plan')}
-                className={`flex flex-col items-center transition-colors min-w-[3rem] ${path.includes('care-plan') ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
+                className={`flex flex-col items-center justify-center transition-colors min-w-[48px] min-h-[48px] rounded-lg active:scale-95 ${path.includes('care-plan') ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
                   }`}
               >
-                <ClipboardList className="w-6 h-6" />
-                <span className="text-[10px] font-medium mt-1">Binder</span>
+                <ClipboardList className="w-5 sm:w-6 h-5 sm:h-6" />
+                <span className="text-[10px] font-medium mt-0.5">Binder</span>
               </button>
-              <div className="w-px bg-[var(--color-neutral-200)] h-full"></div>
+              <div className="w-px bg-[var(--color-neutral-200)] h-8 self-center hidden sm:block"></div>
             </>
           )}
 
           <button
             onClick={() => handleNavigation(isClientFlow ? 'client-inbox' : 'caregiver-inbox')}
-            className={`flex flex-col items-center transition-colors min-w-[3rem] ${path.includes('inbox') ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
+            className={`flex flex-col items-center justify-center transition-colors min-w-[48px] min-h-[48px] rounded-lg active:scale-95 ${path.includes('inbox') ? activeColor : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
               }`}
           >
             <div className="relative">
-              <MessageSquare className="w-6 h-6" />
+              <MessageSquare className="w-5 sm:w-6 h-5 sm:h-6" />
               {/* Badge could be dynamic */}
             </div>
-            <span className="text-[var(--color-neutral-400)] text-[10px] font-medium mt-1">Chat</span>
+            <span className="text-[var(--color-neutral-400)] text-[10px] font-medium mt-0.5">Chat</span>
           </button>
 
-          <div className="w-px bg-[var(--color-neutral-200)] h-full"></div>
+          <div className="w-px bg-[var(--color-neutral-200)] h-8 self-center hidden sm:block"></div>
 
           <button
             onClick={() => handleNavigation(isClientFlow ? 'client-profile' : 'caregiver-profile')}
-            className={`flex flex-col items-center transition-colors min-w-[3rem] ${path.includes('profile')
+            className={`flex flex-col items-center justify-center transition-colors min-w-[48px] min-h-[48px] rounded-lg active:scale-95 ${path.includes('profile')
               ? activeColor
               : 'text-[var(--color-neutral-400)] hover:text-[var(--color-neutral-600)]'
               }`}
           >
-            <Settings className="w-6 h-6" />
-            <span className="text-[10px] font-medium mt-1">Profile</span>
+            <Settings className="w-5 sm:w-6 h-5 sm:h-6" />
+            <span className="text-[10px] font-medium mt-0.5">Profile</span>
           </button>
         </div>
       )}
@@ -320,6 +353,36 @@ const AppContent: React.FC = () => {
           onRefundRequested={handleRefundRequested}
         />
       )}
+
+      {/* Video Interview Modals */}
+      <Suspense fallback={null}>
+        {scheduleInterviewCaregiver && (
+          <ScheduleInterviewModal
+            caregiver={scheduleInterviewCaregiver}
+            onClose={() => setScheduleInterviewCaregiver(null)}
+            onSuccess={(message) => {
+              addToast(message, 'success');
+              setScheduleInterviewCaregiver(null);
+            }}
+            onShowToast={addToast}
+          />
+        )}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {activeInterview && (
+          <VideoInterviewRoom
+            interview={activeInterview}
+            userId={currentUser?.uid || ''}
+            userName={currentUser?.displayName || 'User'}
+            onEnd={() => {
+              setActiveInterview(null);
+              addToast('Interview ended', 'info');
+            }}
+            onShowToast={addToast}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

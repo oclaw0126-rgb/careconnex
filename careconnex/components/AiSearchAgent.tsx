@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Sparkles, Mic, MapPin, Star, User, ChevronRight, SlidersHorizontal, Check, Calendar, Clock, ShieldCheck, Trash2, Loader2 } from 'lucide-react';
+import { X, Send, Sparkles, Mic, MapPin, Star, User, ChevronRight, SlidersHorizontal, Check, Calendar, Clock, ShieldCheck, Trash2, Loader2, Video } from 'lucide-react';
 import { Caregiver, ChatMessage, Appointment, Senior } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -15,6 +15,8 @@ interface AiSearchAgentProps {
   onClose: () => void;
   caregivers: Caregiver[];
   onBookCaregiver: (caregiver: Caregiver) => void;
+  onViewProfile?: (caregiver: Caregiver) => void;
+  onScheduleInterview?: (caregiver: Caregiver) => void;
   initialQuery?: string;
   seniorProfile?: Senior;
   previousBookings?: Appointment[];
@@ -45,6 +47,8 @@ export const AiSearchAgent: React.FC<AiSearchAgentProps> = ({
   onClose,
   caregivers,
   onBookCaregiver,
+  onViewProfile,
+  onScheduleInterview,
   initialQuery,
   seniorProfile,
   previousBookings = []
@@ -630,15 +634,37 @@ export const AiSearchAgent: React.FC<AiSearchAgentProps> = ({
                         <div className="mt-2 text-[10px] text-slate-400">
                           Avail: {caregiver.availability.slice(0, 3).join(", ")}{caregiver.availability.length > 3 ? "..." : ""}
                         </div>
-                        <button
-                          onClick={() => {
-                            onBookCaregiver(caregiver);
-                            onClose();
-                          }}
-                          className="mt-2 w-full py-1.5 bg-slate-100 hover:bg-teal-50 text-teal-700 text-xs font-bold rounded-lg transition-colors"
-                        >
-                          View & Hire
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => {
+                              onBookCaregiver(caregiver);
+                              setTimeout(() => onClose(), 100);
+                            }}
+                            className="py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg transition-colors"
+                          >
+                            Book
+                          </button>
+                          <button
+                            onClick={() => {
+                              onViewProfile?.(caregiver);
+                              setTimeout(() => onClose(), 100);
+                            }}
+                            className="py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors"
+                          >
+                            Profile
+                          </button>
+                          <button
+                            onClick={() => {
+                              onScheduleInterview?.(caregiver);
+                              setTimeout(() => onClose(), 100);
+                            }}
+                            className="py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+                          >
+                            <Video className="w-3 h-3" />
+                            Call
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

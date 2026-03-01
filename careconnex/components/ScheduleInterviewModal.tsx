@@ -66,7 +66,7 @@ export const ScheduleInterviewModal: React.FC<ScheduleInterviewModalProps> = ({
                 return;
             }
 
-            const caregiverId = caregiver.uid || (typeof caregiver.id === 'string' ? caregiver.id : caregiver.id.toString());
+            const caregiverId = caregiver.uid || caregiver.id;
 
             console.log('👨‍⚕️ [ScheduleInterviewModal] Caregiver info:', {
                 caregiverId,

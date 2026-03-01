@@ -36,7 +36,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupExpiredRateLimits = exports.sendTestSMS = void 0;
+exports.cleanupExpiredRateLimits = exports.onTaskCreated = exports.sendTestSMS = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 // Initialize Admin globally if not already done
@@ -72,6 +72,8 @@ __exportStar(require("./caraRailway"), exports);
 // export * from './whatsappV2';
 // Export Phase 2: Proactive Cron Jobs
 __exportStar(require("./caraCron"), exports);
+// Export Encryption Functions (Server-side PII handling)
+__exportStar(require("./encryption"), exports);
 // Export Phase 3: Advanced Intelligence
 __exportStar(require("./caraMemory"), exports);
 __exportStar(require("./caraCalendar"), exports);
@@ -80,8 +82,13 @@ __exportStar(require("./caraFamily"), exports);
 // Export Phase 4: OpenClaw-Inspired Agent Core
 __exportStar(require("./caraAgentCore"), exports);
 __exportStar(require("./caraWhatsApp"), exports);
+// Export new functions from ./cara/
+var tasks_1 = require("./cara/tasks");
+Object.defineProperty(exports, "onTaskCreated", { enumerable: true, get: function () { return tasks_1.onTaskCreated; } });
 // Export test data population
 __exportStar(require("./populateTestData"), exports);
+// Export OpenAI Backend Functions (secure, server-side)
+__exportStar(require("./openaiBackend"), exports);
 // Export Rate Limit cleanup (scheduled)
 const rateLimit_1 = require("./rateLimit");
 /**

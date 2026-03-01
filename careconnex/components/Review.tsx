@@ -356,7 +356,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ caregiverId }) => 
         {Object.entries(rating.categories).map(([key, value]) => (
           <div key={key} className="text-center">
             <p className="text-xs text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-            <p className="font-bold text-slate-700">{value.toFixed(1)}</p>
+            <p className="font-bold text-slate-700">{(value as number).toFixed(1)}</p>
           </div>
         ))}
       </div>

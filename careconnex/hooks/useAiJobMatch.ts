@@ -101,13 +101,30 @@ async function scoreJobForCaregiver(job: JobPost, caregiver: Caregiver): Promise
   }
 
   // 3. Location/Distance (20 points max)
-  // If caregiver has location preferences
   if (caregiver.location && job.location) {
-    // Simple string matching for now - could be enhanced with geocoding
-    if (job.location.toLowerCase().includes(caregiver.location.toLowerCase()) ||
-        caregiver.location.toLowerCase().includes(job.location.toLowerCase())) {
+    const cLoc = caregiver.location.toLowerCase();
+    const jLoc = job.location.toLowerCase();
+    const normalizeLoc = (loc: string) => loc.replace(/[^a-z0-9]/g, '');
+    
+    // Substring or exact match
+    if (jLoc.includes(cLoc) || cLoc.includes(jLoc)) {
       score += 20;
       reasons.push('Location is convenient');
+    }
+    // Normalized match (handles "San Francisco, CA" vs "San Francisco CA")
+    else if (normalizeLoc(jLoc) === normalizeLoc(cLoc)) {
+      score += 15;
+      reasons.push('Location is a close match');
+    }
+    // Partial word matching for fuzzy matching
+    else {
+      const cWords = cLoc.split(/[\s,]+/).filter(w => w.length > 2);
+      const jWords = jLoc.split(/[\s,]+/).filter(w => w.length > 2);
+      const hasCommonWord = cWords.some(w => jWords.includes(w));
+      if (hasCommonWord) {
+        score += 10;
+        reasons.push('Location might be nearby');
+      }
     }
   }
 

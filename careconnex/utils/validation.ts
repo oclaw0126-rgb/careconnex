@@ -300,16 +300,14 @@ export function validateZipCode(zipCode: string): { valid: boolean; error?: stri
 }
 
 /**
- * Sanitize a string to prevent XSS
+ * Sanitize a string to prevent XSS by removing dangerous content
  */
 export function sanitizeString(input: string): string {
   return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+    .replace(/[<>]/g, '') // Remove angle brackets
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, '') // Remove event handlers (onclick, onerror, etc.)
+    .substring(0, 4000); // Limit length
 }
 
 /**
@@ -428,4 +426,403 @@ export function getSafeErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'An unknown error occurred';
+}
+
+// ==========================================
+// SCHEMA VALIDATION SYSTEM (For Tests)
+// ==========================================
+
+interface Schema<T> {
+  parse(value: unknown): T;
+  safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } };
+}
+
+class StringSchema implements Schema<string> {
+  private validators: Array<(value: string) => void> = [];
+  private transformFns: Array<(value: string) => string> = [];
+
+  email(): this {
+    this.validators.push((value) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        throw new Error('Invalid email format');
+      }
+    });
+    return this;
+  }
+
+  regex(pattern: RegExp, message?: string): this {
+    this.validators.push((value) => {
+      if (!pattern.test(value)) {
+        throw new Error(message || `Value does not match required pattern`);
+      }
+    });
+    return this;
+  }
+
+  min(length: number): this {
+    this.validators.push((value) => {
+      if (value.length < length) {
+        throw new Error(`String must be at least ${length} characters`);
+      }
+    });
+    return this;
+  }
+
+  max(length: number): this {
+    this.validators.push((value) => {
+      if (value.length > length) {
+        throw new Error(`String must be at most ${length} characters`);
+      }
+    });
+    return this;
+  }
+
+  transform(fn: (value: string) => string): this {
+    this.transformFns.push(fn);
+    return this;
+  }
+
+  parse(value: unknown): string {
+    if (typeof value !== 'string') {
+      throw new Error('Value must be a string');
+    }
+    
+    // Apply all transforms in sequence
+    let transformed = value;
+    for (const fn of this.transformFns) {
+      transformed = fn(transformed);
+    }
+    
+    // Run validators
+    for (const validator of this.validators) {
+      validator(transformed);
+    }
+    
+    return transformed;
+  }
+
+  safeParse(value: unknown): { success: true; data: string } | { success: false; error: { message: string } } {
+    try {
+      const data = this.parse(value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: { message: (error as Error).message } };
+    }
+  }
+}
+
+class NumberSchema implements Schema<number> {
+  private minVal?: number;
+  private maxVal?: number;
+
+  min(value: number): this {
+    this.minVal = value;
+    return this;
+  }
+
+  max(value: number): this {
+    this.maxVal = value;
+    return this;
+  }
+
+  parse(value: unknown): number {
+    const num = Number(value);
+    if (isNaN(num)) {
+      throw new Error('Value must be a number');
+    }
+    if (this.minVal !== undefined && num < this.minVal) {
+      throw new Error(`Number must be at least ${this.minVal}`);
+    }
+    if (this.maxVal !== undefined && num > this.maxVal) {
+      throw new Error(`Number must be at most ${this.maxVal}`);
+    }
+    return num;
+  }
+
+  safeParse(value: unknown): { success: true; data: number } | { success: false; error: { message: string } } {
+    try {
+      const data = this.parse(value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: { message: (error as Error).message } };
+    }
+  }
+}
+
+class ArraySchema<T> implements Schema<T[]> {
+  constructor(private itemSchema?: Schema<T>) {}
+
+  parse(value: unknown): T[] {
+    if (!Array.isArray(value)) {
+      throw new Error('Value must be an array');
+    }
+    if (this.itemSchema) {
+      return value.map(item => this.itemSchema!.parse(item));
+    }
+    return value as T[];
+  }
+
+  safeParse(value: unknown): { success: true; data: T[] } | { success: false; error: { message: string } } {
+    try {
+      const data = this.parse(value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: { message: (error as Error).message } };
+    }
+  }
+}
+
+class ObjectSchema<T extends Record<string, any>> implements Schema<T> {
+  private shape: Record<string, Schema<any>>;
+  private strictMode = false;
+
+  constructor(shape: Record<string, Schema<any>>) {
+    this.shape = shape;
+  }
+
+  strict(): this {
+    this.strictMode = true;
+    return this;
+  }
+
+  parse(value: unknown): T {
+    if (typeof value !== 'object' || value === null) {
+      throw new Error('Value must be an object');
+    }
+
+    const obj = value as Record<string, any>;
+    const result: Record<string, any> = {};
+
+    // Check for extra fields in strict mode
+    if (this.strictMode) {
+      const allowedKeys = Object.keys(this.shape);
+      const actualKeys = Object.keys(obj);
+      const extraKeys = actualKeys.filter(key => !allowedKeys.includes(key));
+      if (extraKeys.length > 0) {
+        throw new Error(`Unexpected fields: ${extraKeys.join(', ')}`);
+      }
+    }
+
+    for (const [key, schema] of Object.entries(this.shape)) {
+      if (key in obj) {
+        try {
+          result[key] = schema.parse(obj[key]);
+        } catch (error) {
+          throw new Error(`${key}: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    return result as T;
+  }
+
+  safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } } {
+    try {
+      const data = this.parse(value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: { message: (error as Error).message } };
+    }
+  }
+}
+
+// Schema factory functions
+export function string(): StringSchema {
+  return new StringSchema();
+}
+
+export function number(): NumberSchema {
+  return new NumberSchema();
+}
+
+export function array<T>(itemSchema?: Schema<T>): ArraySchema<T> {
+  return new ArraySchema(itemSchema);
+}
+
+export function object<T extends Record<string, any>>(shape: Record<string, Schema<any>>): ObjectSchema<T> {
+  return new ObjectSchema<T>(shape);
+}
+
+// ==========================================
+// PREDEFINED SCHEMAS
+// ==========================================
+
+export const emailSchema = string()
+  .email()
+  .min(6) // Reject short emails like a@b.c
+  .transform(v => v.toLowerCase());
+
+export const phoneSchema = string()
+  .regex(/^\d{10}$/, 'Phone must be 10 digits')
+  .transform(v => v.replace(/\D/g, ''));
+
+export const ssnSchema = string()
+  .transform(v => v.replace(/-/g, ''))
+  .regex(/^\d{9}$/, 'SSN must be 9 digits')
+  .transform(v => {
+    // Check for invalid SSNs (all same digit is invalid)
+    const invalidSSNs = [
+      '000000000', '111111111', '222222222', '333333333', '444444444',
+      '555555555', '666666666', '777777777', '888888888', '999999999'
+    ];
+    if (invalidSSNs.includes(v)) {
+      throw new Error('Invalid SSN');
+    }
+    // Check SSN format rules
+    const area = v.substring(0, 3);
+    const group = v.substring(3, 5);
+    const serial = v.substring(5, 9);
+    if (area === '000' || area === '666' || parseInt(area) >= 900) {
+      throw new Error('Invalid SSN area number');
+    }
+    if (group === '00') {
+      throw new Error('Invalid SSN group number');
+    }
+    if (serial === '0000') {
+      throw new Error('Invalid SSN serial number');
+    }
+    return v;
+  });
+
+export const zipCodeSchema = string()
+  .regex(/^\d{5}(-\d{4})?$/, 'Invalid ZIP code format');
+
+class BooleanSchema implements Schema<boolean> {
+  parse(value: unknown): boolean {
+    if (typeof value !== 'boolean') {
+      throw new Error('Value must be a boolean');
+    }
+    return value;
+  }
+  safeParse(value: unknown): { success: true; data: boolean } | { success: false; error: { message: string } } {
+    try {
+      return { success: true, data: this.parse(value) };
+    } catch (e) {
+      return { success: false, error: { message: (e as Error).message } };
+    }
+  }
+}
+
+export function boolean(): BooleanSchema {
+  return new BooleanSchema();
+}
+
+class TrueBooleanSchema implements Schema<true> {
+  parse(value: unknown): true {
+    if (value !== true) {
+      throw new Error('Value must be true');
+    }
+    return true;
+  }
+  safeParse(value: unknown): { success: true; data: true } | { success: false; error: { message: string } } {
+    try {
+      return { success: true, data: this.parse(value) };
+    } catch (e) {
+      return { success: false, error: { message: (e as Error).message } };
+    }
+  }
+}
+
+export function trueBoolean(): TrueBooleanSchema {
+  return new TrueBooleanSchema();
+}
+
+export const caregiverSignupSchema = object({
+  name: string().min(2),
+  email: emailSchema,
+  phone: phoneSchema,
+  hourlyRate: number().min(15).max(200),
+  bio: string().min(50),
+  skills: array(string()),
+  certifications: array(string()),
+  backgroundCheckData: object({
+    legalFirstName: string(),
+    legalLastName: string(),
+    dob: string(),
+    ssn: ssnSchema,
+    address: string(),
+    city: string(),
+    state: string(),
+    zip: zipCodeSchema,
+    consentGiven: trueBoolean()
+  }),
+  hasTransportation: boolean(),
+  isSmoker: boolean(),
+  gender: string(),
+  experience: number().min(0),
+  acceptsMicroVisits: boolean()
+}).strict();
+
+export const seniorSchema = object({
+  name: string().min(2),
+  age: number().min(50).max(120),
+  location: string(),
+  zipCode: zipCodeSchema,
+  needs: array(string()),
+  personality: string(),
+  phone: phoneSchema
+});
+
+export const appointmentSchema = object({
+  clientId: string(),
+  caregiverId: string(),
+  caregiverName: string(),
+  clientName: string(),
+  date: string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  time: string().regex(/^\d{2}:\d{2}$/, 'Time must be HH:MM'),
+  cost: number().min(0)
+});
+
+export const messageSchema = object({
+  text: string().min(1).max(2000),
+  senderId: string()
+});
+
+// ==========================================
+// VALIDATION HELPERS
+// ==========================================
+
+export function validate<T>(schema: Schema<T>, value: unknown): T {
+  try {
+    return schema.parse(value);
+  } catch (error) {
+    throw new Error('Validation failed');
+  }
+}
+
+export function validateSafe<T>(schema: Schema<T>, value: unknown): 
+  | { success: true; data: T }
+  | { success: false; error: string } {
+  const result = schema.safeParse(value);
+  if (result.success) {
+    return { success: true, data: result.data };
+  } else {
+    return { success: false, error: result.error.message };
+  }
+}
+
+// ==========================================
+// IMAGE FILE VALIDATION
+// ==========================================
+
+interface ImageValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+export function validateImageFile(file: File): ImageValidationResult {
+  // Check file type
+  const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    return { valid: false, error: 'Only JPEG, PNG, GIF, and WebP images are allowed' };
+  }
+
+  // Check file size (5MB max)
+  const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+  if (file.size > maxSize) {
+    return { valid: false, error: 'Image must be less than 5MB' };
+  }
+
+  return { valid: true };
 }

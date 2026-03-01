@@ -1,7 +1,10 @@
-
 import React, { useState } from 'react';
 import { ViewType } from '../types';
-import { ArrowLeft, Search, MessageSquare, Heart, ShieldCheck, DollarSign, Calendar, Activity, X, Users, ChevronRight } from 'lucide-react';
+import { 
+  ArrowLeft, Search, MessageSquare, Heart, ShieldCheck, DollarSign, 
+  Calendar, Activity, X, Users, ChevronRight, MessageCircle, Phone,
+  CheckCircle, MapPin, Clock, Star, ChevronDown, Zap, Lock
+} from 'lucide-react';
 import { Button } from './ui/Button';
 import { SEO } from './SEO';
 import { LegalDocs } from './LegalDocs';
@@ -13,13 +16,121 @@ interface HowItWorksProps {
 export const HowItWorks: React.FC<HowItWorksProps> = ({ onNavigate }) => {
    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
    const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+   const [activeTab, setActiveTab] = useState<'families' | 'caregivers'>('families');
+
+   const caraWhatsAppNumber = '+15595204349';
+
+   const familySteps = [
+      {
+         step: "01",
+         icon: <MessageCircle className="w-6 h-6" />,
+         title: "Text Cara or Search Online",
+         desc: "Message our AI Care Coordinator on WhatsApp for instant help, or browse caregivers directly on our platform. Tell us about your loved one's needs, schedule, and preferences.",
+         highlight: "Takes 2 minutes",
+         color: "teal"
+      },
+      {
+         step: "02",
+         icon: <Search className="w-6 h-6" />,
+         title: "Get Matched Instantly",
+         desc: "Our AI analyzes your needs and matches you with verified caregivers in Santa Clara County. View profiles, rates, experience, and reviews. All caregivers are background-checked and insured.",
+         highlight: "Smart AI matching",
+         color: "blue"
+      },
+      {
+         step: "03",
+         icon: <Calendar className="w-6 h-6" />,
+         title: "Interview & Hire",
+         desc: "Schedule video interviews with your top choices. Ask questions, discuss care plans, and find the perfect fit. No pressure, no obligation until you're ready.",
+         highlight: "You decide",
+         color: "purple"
+      },
+      {
+         step: "04",
+         icon: <ShieldCheck className="w-6 h-6" />,
+         title: "Book with Confidence",
+         desc: "Secure your booking with built-in liability insurance from Bunker. GPS time tracking, secure payments, and 24/7 support included. Start care and get peace of mind.",
+         highlight: "Fully insured",
+         color: "green"
+      }
+   ];
+
+   const caregiverSteps = [
+      {
+         step: "01",
+         icon: <Users className="w-6 h-6" />,
+         title: "Create Your Profile",
+         desc: "Sign up for free and build your professional profile. Showcase your experience, certifications, availability, and special skills. Set your own hourly rate.",
+         highlight: "Free to join",
+         color: "orange"
+      },
+      {
+         step: "02",
+         icon: <ShieldCheck className="w-6 h-6" />,
+         title: "Get Verified",
+         desc: "Complete our background check through Checkr. Verified caregivers get priority placement and 3x more job offers. We handle the verification cost.",
+         highlight: "Stand out",
+         color: "purple"
+      },
+      {
+         step: "03",
+         icon: <Star className="w-6 h-6" />,
+         title: "Accept Jobs You Want",
+         desc: "Browse local care opportunities that match your skills and schedule. No forced assignments - you choose the families you want to work with.",
+         highlight: "Flexible work",
+         color: "blue"
+      },
+      {
+         step: "04",
+         icon: <DollarSign className="w-6 h-6" />,
+         title: "Get Paid Instantly",
+         desc: "Clock in/out with GPS verification. Funds transfer to your bank automatically after each shift. Keep 100% of your rate - families pay the platform fee.",
+         highlight: "Fast payment",
+         color: "green"
+      }
+   ];
+
+   const faqs = [
+      {
+         q: "How much does it cost?",
+         a: "Families pay $49.99/month for unlimited access to the platform, plus the caregiver's hourly rate ($22-35/hour). There are no hidden fees, no placement fees, and no long-term contracts. Caregivers join for free and keep 100% of their hourly rate."
+      },
+      {
+         q: "How is this different from a traditional agency?",
+         a: "Traditional agencies charge $35-50/hour and keep 40-50% as their markup. With CareConnex, you pay caregivers directly at market rates ($22-35/hour) plus a flat monthly fee. You get more control, better transparency, and caregivers earn more."
+      },
+      {
+         q: "Are the caregivers really verified?",
+         a: "Yes. Every caregiver undergoes a comprehensive background check through Checkr, including criminal history, sex offender registry, and driving records. We also verify certifications and require liability insurance coverage."
+      },
+      {
+         q: "What areas do you serve?",
+         a: "We currently serve Santa Clara County including San Jose, Santa Clara, Sunnyvale, Mountain View, Palo Alto, Cupertino, Los Gatos, Campbell, Milpitas, and surrounding areas. We're expanding to more locations soon."
+      },
+      {
+         q: "What if I don't like my caregiver?",
+         a: "You can switch caregivers anytime at no extra cost. We encourage families to interview multiple candidates before hiring. If a caregiver isn't the right fit, simply message Cara or browse for a new match."
+      },
+      {
+         q: "How do payments work?",
+         a: "Families pay caregivers directly via secure Stripe integration. Caregivers clock in/out with GPS verification. Payment is processed automatically after each shift. Families receive invoices, caregivers get paid fast."
+      }
+   ];
+
+   const features = [
+      { icon: <ShieldCheck className="w-5 h-5" />, text: "Background checked" },
+      { icon: <Lock className="w-5 h-5" />, text: "$5M insurance included" },
+      { icon: <Clock className="w-5 h-5" />, text: "GPS time tracking" },
+      { icon: <Zap className="w-5 h-5" />, text: "Instant matching" }
+   ];
 
    return (
-      <div className="min-h-screen bg-white">
+      <div id="how-it-works" className="min-h-screen bg-white">
          <SEO
-            title="How CareConnex Works - Find Caregivers in 3 Easy Steps"
-            description="Learn how CareConnex connects families with verified caregivers. Search, message, and hire trusted in-home care professionals."
-            keywords="how it works, find caregivers, hire caregivers, senior care process, caregiver matching"
+            title="How CareConnex Works - Simple 4-Step Process"
+            description="Find verified caregivers in Santa Clara County in 4 simple steps. AI-powered matching, background checks, and insurance included."
+            keywords="how it works, find caregivers, hire caregivers, senior care process, caregiver matching, Santa Clara County"
             canonicalUrl="https://careconnex-d4c8b.web.app/how-it-works"
          />
 
@@ -34,17 +145,15 @@ export const HowItWorks: React.FC<HowItWorksProps> = ({ onNavigate }) => {
                      <span className="text-2xl font-bold text-slate-900 tracking-tight">CareConnex</span>
                   </div>
 
-                  {/* Desktop Nav */}
                   <nav className="hidden md:flex items-center space-x-8">
                      <button onClick={() => onNavigate('client-signup')} className="text-slate-600 hover:text-teal-600 font-medium transition-colors">Find Care</button>
                      <button onClick={() => onNavigate('caregiver-signup')} className="text-slate-600 hover:text-orange-500 font-medium transition-colors">Find Jobs</button>
-                     <button onClick={() => onNavigate('how-it-works')} className="text-slate-600 hover:text-slate-900 font-medium transition-colors">How it Works</button>
-                     <button onClick={() => onNavigate('subscription')} className="text-slate-400 hover:text-slate-600 text-sm font-medium">Pricing</button>
-                     <button onClick={() => onNavigate('insurance')} className="text-slate-400 hover:text-slate-600 text-sm font-medium">Insurance</button>
+                     <button onClick={() => onNavigate('subscription')} className="text-slate-500 hover:text-slate-700 font-medium transition-colors">Pricing</button>
+                     <button onClick={() => onNavigate('insurance')} className="text-slate-500 hover:text-slate-700 font-medium transition-colors">Insurance</button>
                   </nav>
 
                   <div className="flex items-center space-x-4">
-                     <button onClick={() => setIsLoginModalOpen(true)} className="text-slate-600 hover:text-teal-600 font-medium">Log In</button>
+                     <button onClick={() => setIsLoginModalOpen(true)} className="hidden md:block text-slate-600 hover:text-teal-600 font-medium">Log In</button>
                      <Button onClick={() => onNavigate('client-signup')}>Get Started</Button>
                   </div>
                </div>
@@ -53,22 +162,73 @@ export const HowItWorks: React.FC<HowItWorksProps> = ({ onNavigate }) => {
 
          <main>
             {/* Hero Section */}
-            <section className="py-20 bg-slate-50 border-b border-slate-100">
-               <div className="max-w-4xl mx-auto px-4 text-center">
-                  <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">Care made simple.</h1>
-                  <p className="text-xl text-slate-600 leading-relaxed mb-8">
-                     Whether you need help or want to help, CareSync streamlines the entire process using AI-driven matching and secure, direct payments.
+            <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 text-white py-20 lg:py-28">
+               <div className="absolute inset-0 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-teal-500/10 to-transparent"></div>
+                  <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+               </div>
+               
+               <div className="relative max-w-4xl mx-auto px-4 text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-8">
+                     <MapPin className="w-4 h-4 text-teal-400" />
+                     <span className="text-sm font-medium">Now Serving Santa Clara County</span>
+                  </div>
+                  
+                  <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+                     Finding care just got <span className="text-teal-400">simple.</span>
+                  </h1>
+                  <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
+                     No agencies. No markups. No endless phone calls. Just verified, local caregivers ready to help your family.
                   </p>
-                  <div className="flex justify-center gap-4">
+
+                  {/* Feature Pills */}
+                  <div className="flex flex-wrap justify-center gap-3 mb-10">
+                     {features.map((feature, i) => (
+                        <div key={i} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
+                           <span className="text-teal-400">{feature.icon}</span>
+                           <span className="text-sm font-medium">{feature.text}</span>
+                        </div>
+                     ))}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-center gap-4">
+                     <Button size="lg" onClick={() => onNavigate('client-signup')} className="shadow-xl shadow-teal-500/20">
+                        Find a Caregiver
+                     </Button>
+                     <a 
+                        href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20tell%20me%20how%20this%20works`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold transition-all"
+                     >
+                        <MessageCircle className="w-5 h-5" />
+                        Ask Cara on WhatsApp
+                     </a>
+                  </div>
+               </div>
+            </section>
+
+            {/* Tab Switcher */}
+            <section className="py-12 bg-slate-50 border-b border-slate-200">
+               <div className="max-w-3xl mx-auto px-4">
+                  <div className="flex p-1 bg-white rounded-2xl shadow-sm border border-slate-200">
                      <button
-                        onClick={() => document.getElementById('for-families')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="px-6 py-3 bg-white text-teal-700 font-bold rounded-xl shadow-sm border border-slate-200 hover:border-teal-300 transition-all"
+                        onClick={() => setActiveTab('families')}
+                        className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-all ${
+                           activeTab === 'families' 
+                              ? 'bg-teal-600 text-white shadow-lg' 
+                              : 'text-slate-600 hover:text-slate-900'
+                        }`}
                      >
                         For Families
                      </button>
                      <button
-                        onClick={() => document.getElementById('for-caregivers')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="px-6 py-3 bg-white text-orange-600 font-bold rounded-xl shadow-sm border border-slate-200 hover:border-orange-300 transition-all"
+                        onClick={() => setActiveTab('caregivers')}
+                        className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-all ${
+                           activeTab === 'caregivers' 
+                              ? 'bg-orange-500 text-white shadow-lg' 
+                              : 'text-slate-600 hover:text-slate-900'
+                        }`}
                      >
                         For Caregivers
                      </button>
@@ -76,163 +236,564 @@ export const HowItWorks: React.FC<HowItWorksProps> = ({ onNavigate }) => {
                </div>
             </section>
 
-            {/* For Families */}
-            <section id="for-families" className="py-24">
-               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex flex-col md:flex-row gap-12 items-center mb-16">
-                     <div className="md:w-1/2">
-                        <span className="text-teal-600 font-bold tracking-wider uppercase text-sm mb-2 block">Families</span>
-                        <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Find your perfect match in minutes.</h2>
-                        <p className="text-lg text-slate-600">
-                           Forget the agencies with high markups and rigid contracts. CareSync puts you in control.
-                        </p>
-                     </div>
-                     <div className="md:w-1/2 flex justify-center">
-                        <img
-                           src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                           alt="Caregiver walking with senior in kitchen"
-                           className="rounded-3xl shadow-xl w-full max-w-md object-cover"
-                        />
-                     </div>
+            {/* Steps Section */}
+            <section className="py-20 lg:py-28">
+               <div className="max-w-5xl mx-auto px-4">
+                  <div className="text-center mb-16">
+                     <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                        {activeTab === 'families' ? 'Find care in 4 simple steps' : 'Start earning in 4 simple steps'}
+                     </h2>
+                     <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                        {activeTab === 'families' 
+                           ? 'From search to care, we handle the hard parts so you can focus on your loved one.'
+                           : 'Join thousands of caregivers earning more with flexible schedules and instant payments.'
+                        }
+                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-8">
-                     {[
-                        {
-                           icon: <Search className="w-8 h-8 text-white" />,
-                           color: "bg-teal-500",
-                           title: "1. Create Profile & Search",
-                           desc: "Tell us about your loved one's needs. Our Smart Match AI instantly recommends verified caregivers nearby who fit your specific medical and personality requirements."
-                        },
-                        {
-                           icon: <MessageSquare className="w-8 h-8 text-white" />,
-                           color: "bg-blue-500",
-                           title: "2. Chat & Interview",
-                           desc: "Message candidates directly. Schedule a video call or a meet-and-greet. You decide who comes into your home."
-                        },
-                        {
-                           icon: <ShieldCheck className="w-8 h-8 text-white" />,
-                           color: "bg-green-500",
-                           title: "3. Book & Relax",
-                           desc: "Secure the booking. We handle the background checks, liability insurance, and time-tracking automatically."
-                        }
-                     ].map((step, i) => (
-                        <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                           <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-slate-200`}>
+                  <div className="space-y-8">
+                     {(activeTab === 'families' ? familySteps : caregiverSteps).map((step, i) => (
+                        <div 
+                           key={i} 
+                           className={`relative flex flex-col md:flex-row gap-6 md:gap-10 p-8 rounded-3xl border transition-all hover:shadow-lg ${
+                              activeTab === 'families' 
+                                 ? 'bg-white border-slate-200 hover:border-teal-200' 
+                                 : 'bg-white border-slate-200 hover:border-orange-200'
+                           }`}
+                        >
+                           {/* Step Number */}
+                           <div className="flex-shrink-0">
+                              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold ${
+                                 activeTab === 'families' ? 'bg-teal-100 text-teal-700' : 'bg-orange-100 text-orange-700'
+                              }`}>
+                                 {step.step}
+                              </div>
+                           </div>
+
+                           {/* Content */}
+                           <div className="flex-grow">
+                              <div className="flex flex-wrap items-center gap-3 mb-3">
+                                 <h3 className="text-xl font-bold text-slate-900">{step.title}</h3>
+                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    activeTab === 'families' 
+                                       ? 'bg-teal-50 text-teal-700' 
+                                       : 'bg-orange-50 text-orange-700'
+                                 }`}>
+                                    {step.highlight}
+                                 </span>
+                              </div>
+                              <p className="text-slate-600 leading-relaxed">{step.desc}</p>
+                           </div>
+
+                           {/* Icon */}
+                           <div className={`flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center ${
+                              activeTab === 'families' ? 'bg-teal-600 text-white' : 'bg-orange-500 text-white'
+                           }`}>
                               {step.icon}
                            </div>
-                           <h3 className="text-xl font-bold text-slate-900 mb-3">{step.title}</h3>
-                           <p className="text-slate-500 leading-relaxed">{step.desc}</p>
                         </div>
                      ))}
                   </div>
 
+                  {/* CTA */}
                   <div className="mt-12 text-center">
-                     <Button onClick={() => onNavigate('client-signup')} size="lg">Find Care Now</Button>
+                     <Button 
+                        size="lg" 
+                        variant={activeTab === 'families' ? 'primary' : 'accent'}
+                        onClick={() => onNavigate(activeTab === 'families' ? 'client-signup' : 'caregiver-signup')}
+                     >
+                        {activeTab === 'families' ? 'Get Started - Find Care' : 'Join as a Caregiver'}
+                     </Button>
+                     <p className="mt-4 text-sm text-slate-500">
+                        {activeTab === 'families' 
+                           ? 'Free to browse. $49.99/month when you hire.' 
+                           : 'Free to join. Keep 100% of your rate.'
+                        }
+                     </p>
                   </div>
                </div>
             </section>
 
-            {/* For Caregivers */}
-            <section id="for-caregivers" className="py-24 bg-slate-900 text-white">
-               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex flex-col md:flex-row gap-12 items-center mb-16">
-                     <div className="md:w-1/2 order-2 md:order-1 flex justify-center">
-                        <img
-                           src="https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                           alt="Caregiver helping senior with personal care"
-                           className="rounded-3xl shadow-xl shadow-orange-900/20 w-full max-w-md object-cover"
-                        />
-                     </div>
-                     <div className="md:w-1/2 order-1 md:order-2">
-                        <span className="text-orange-500 font-bold tracking-wider uppercase text-sm mb-2 block">Caregivers</span>
-                        <h2 className="text-3xl md:text-4xl font-bold mb-6">Earn more. Work on your terms.</h2>
-                        <p className="text-lg text-slate-300">
-                           Build your own business without the overhead. Keep 100% of your hourly rate (clients pay the platform fee).
-                        </p>
+            {/* Meet Cara Section */}
+            <section className="py-20 bg-gradient-to-br from-teal-50 to-cyan-50">
+               <div className="max-w-4xl mx-auto px-4">
+                  <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl shadow-teal-900/5 border border-teal-100">
+                     <div className="flex flex-col md:flex-row items-center gap-8">
+                        <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-3xl flex items-center justify-center shadow-xl shadow-teal-500/20">
+                           <MessageCircle className="w-12 h-12 text-white" />
+                        </div>
+                        <div className="flex-1 text-center md:text-left">
+                           <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-3">
+                              Meet Cara, Your AI Care Coordinator
+                           </h2>
+                           <p className="text-slate-600 mb-6 leading-relaxed">
+                              Not sure where to start? Text Cara on WhatsApp and she'll guide you through the entire process. 
+                              She can answer questions, help you find caregivers, and even schedule interviews. Available 24/7.
+                           </p>
+                           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                              <a 
+                                 href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20I%20need%20help%20finding%20a%20caregiver`}
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-all shadow-lg shadow-teal-600/20"
+                              >
+                                 <Phone className="w-5 h-5" />
+                                 Text Cara: {caraWhatsAppNumber}
+                              </a>
+                           </div>
+                        </div>
                      </div>
                   </div>
+               </div>
+            </section>
 
-                  <div className="grid md:grid-cols-3 gap-8">
-                     {[
-                        {
-                           icon: <ShieldCheck className="w-8 h-8 text-white" />,
-                           color: "bg-purple-600",
-                           title: "1. Get Verified",
-                           desc: "Complete our secure background check and upload your certifications. Verified Pros get 3x more job offers."
-                        },
-                        {
-                           icon: <Calendar className="w-8 h-8 text-white" />,
-                           color: "bg-orange-500",
-                           title: "2. Accept Jobs",
-                           desc: "Browse local gigs that match your skills. Accept the ones that fit your schedule instantly."
-                        },
-                        {
-                           icon: <DollarSign className="w-8 h-8 text-white" />,
-                           color: "bg-green-600",
-                           title: "3. Instant Pay",
-                           desc: "Clock in/out with GPS verification. As soon as the shift ends, funds are transferred to your bank via Stripe."
-                        }
-                     ].map((step, i) => (
-                        <div key={i} className="bg-slate-800 p-8 rounded-3xl border border-slate-700">
-                           <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-6`}>
-                              {step.icon}
-                           </div>
-                           <h3 className="text-xl font-bold text-white mb-3">{step.title}</h3>
-                           <p className="text-slate-400 leading-relaxed">{step.desc}</p>
+            {/* Pricing Transparency */}
+            <section className="py-20 bg-white">
+               <div className="max-w-4xl mx-auto px-4 text-center">
+                  <h2 className="text-3xl font-bold text-slate-900 mb-4">Simple, transparent pricing</h2>
+                  <p className="text-slate-600 mb-12">No hidden fees. No surprises. Just straightforward care.</p>
+
+                  <div className="grid md:grid-cols-2 gap-8">
+                     {/* Family Pricing */}
+                     <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+                        <div className="text-teal-600 font-semibold mb-2">For Families</div>
+                        <div className="flex items-baseline justify-center gap-2 mb-4">
+                           <span className="text-5xl font-bold text-slate-900">$49.99</span>
+                           <span className="text-slate-500">/month</span>
+                        </div>
+                        <p className="text-slate-600 mb-6">Plus caregiver hourly rate ($22-35/hour)</p>
+                        <ul className="text-left space-y-3 mb-8">
+                           {[
+                              'Unlimited caregiver matches',
+                              'Background checks included',
+                              '$5M liability insurance',
+                              'GPS time tracking',
+                              '24/7 AI support (Cara)',
+                              'Cancel anytime'
+                           ].map((item, i) => (
+                              <li key={i} className="flex items-center gap-3 text-slate-600">
+                                 <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0" />
+                                 {item}
+                              </li>
+                           ))}
+                        </ul>
+                        <Button fullWidth onClick={() => onNavigate('client-signup')}>
+                           Find Caregivers
+                        </Button>
+                     </div>
+
+                     {/* Caregiver Pricing */}
+                     <div className="bg-orange-50 rounded-3xl p-8 border border-orange-100">
+                        <div className="text-orange-600 font-semibold mb-2">For Caregivers</div>
+                        <div className="flex items-baseline justify-center gap-2 mb-4">
+                           <span className="text-5xl font-bold text-slate-900">Free</span>
+                        </div>
+                        <p className="text-slate-600 mb-6">Keep 100% of your hourly rate</p>
+                        <ul className="text-left space-y-3 mb-8">
+                           {[
+                              'Free profile & job access',
+                              'Instant job notifications',
+                              'Secure payments via Stripe',
+                              'Liability insurance included',
+                              'Direct client relationships',
+                              'Build your reputation'
+                           ].map((item, i) => (
+                              <li key={i} className="flex items-center gap-3 text-slate-600">
+                                 <CheckCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                                 {item}
+                              </li>
+                           ))}
+                        </ul>
+                        <Button variant="accent" fullWidth onClick={() => onNavigate('caregiver-signup')}>
+                           Join as Caregiver
+                        </Button>
+                     </div>
+                  </div>
+               </div>
+            </section>
+
+            {/* FAQ Section */}
+            <section className="py-20 bg-slate-50">
+               <div className="max-w-3xl mx-auto px-4">
+                  <div className="text-center mb-12">
+                     <h2 className="text-3xl font-bold text-slate-900 mb-4">Frequently asked questions</h2>
+                     <p className="text-slate-600">Everything you need to know about CareConnex.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                     {faqs.map((faq, i) => (
+                        <div 
+                           key={i} 
+                           className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+                        >
+                           <button
+                              onClick={() => setActiveFaq(activeFaq === i ? null : i)}
+                              className="w-full flex items-center justify-between p-6 text-left hover:bg-slate-50 transition-colors"
+                           >
+                              <span className="font-semibold text-slate-900 pr-4">{faq.q}</span>
+                              <ChevronDown className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform ${activeFaq === i ? 'rotate-180' : ''}`} />
+                           </button>
+                           {activeFaq === i && (
+                              <div className="px-6 pb-6">
+                                 <p className="text-slate-600 leading-relaxed">{faq.a}</p>
+                              </div>
+                           )}
                         </div>
                      ))}
                   </div>
 
-                  <div className="mt-12 text-center">
-                     <Button variant="accent" onClick={() => onNavigate('caregiver-signup')} size="lg">Join as Caregiver</Button>
+                  <div className="mt-10 text-center">
+                     <p className="text-slate-600 mb-4">Still have questions?</p>
+                     <a 
+                        href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20I%20have%20a%20question`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-teal-600 font-semibold hover:underline"
+                     >
+                        <MessageCircle className="w-5 h-5" />
+                        Ask Cara on WhatsApp
+                     </a>
+                  </div>
+               </div>
+            </section>
+
+            {/* Partner Logos */}
+            <section className="py-16 bg-white border-y border-slate-100">
+               <div className="max-w-5xl mx-auto px-4">
+                  <p className="text-center text-sm font-semibold text-slate-400 uppercase tracking-wider mb-8">
+                     Trusted Partners & Integrations
+                  </p>
+                  <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+                     {/* Bunker */}
+                     <a 
+                        href="https://buildbunker.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                     >
+                        <ShieldCheck className="w-8 h-8 text-blue-600" />
+                        <span className="text-xl font-bold">Bunker</span>
+                     </a>
+                     
+                     {/* Stripe */}
+                     <a 
+                        href="https://stripe.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                     >
+                        <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                           <span className="text-white font-bold text-sm">S</span>
+                        </div>
+                        <span className="text-xl font-bold">Stripe</span>
+                     </a>
+                     
+                     {/* Checkr */}
+                     <a 
+                        href="https://checkr.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                     >
+                        <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
+                           <CheckCircle className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-xl font-bold">Checkr</span>
+                     </a>
+                     
+                     {/* WhatsApp */}
+                     <div className="flex items-center gap-2 text-slate-600">
+                        <MessageCircle className="w-8 h-8 text-green-500" />
+                        <span className="text-xl font-bold">WhatsApp</span>
+                     </div>
+                  </div>
+                  <p className="text-center text-sm text-slate-500 mt-6">
+                     Insurance powered by Bunker • Payments by Stripe • Background checks by Checkr
+                  </p>
+               </div>
+            </section>
+
+            {/* Agency Comparison Table */}
+            <section className="py-20 bg-slate-50">
+               <div className="max-w-4xl mx-auto px-4">
+                  <div className="text-center mb-12">
+                     <h2 className="text-3xl font-bold text-slate-900 mb-4">Why families choose CareConnex</h2>
+                     <p className="text-slate-600">See how we compare to traditional care agencies</p>
+                  </div>
+
+                  <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+                     <div className="overflow-x-auto">
+                        <table className="w-full">
+                           <thead>
+                              <tr className="bg-slate-900 text-white">
+                                 <th className="py-4 px-6 text-left font-semibold">Feature</th>
+                                 <th className="py-4 px-6 text-center font-semibold bg-teal-600">CareConnex</th>
+                                 <th className="py-4 px-6 text-center font-semibold text-slate-400">Traditional Agency</th>
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-100">
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Hourly Rate</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <span className="font-bold text-teal-700">$22-35/hour</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">$35-50/hour</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Agency Markup</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <span className="font-bold text-teal-700">None</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">40-50%</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Contract</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <span className="font-bold text-teal-700">Cancel anytime</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">6-12 months</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Insurance</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <CheckCircle className="w-5 h-5 text-teal-600 mx-auto" />
+                                    <span className="text-sm text-teal-700">$5M included</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">Extra cost</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Background Checks</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <CheckCircle className="w-5 h-5 text-teal-600 mx-auto" />
+                                    <span className="text-sm text-teal-700">Included</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">Varies</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Caregiver Choice</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <span className="font-bold text-teal-700">You choose</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">They assign</td>
+                              </tr>
+                              <tr>
+                                 <td className="py-4 px-6 font-medium text-slate-900">Platform Fee</td>
+                                 <td className="py-4 px-6 text-center bg-teal-50">
+                                    <span className="font-bold text-teal-700">$49.99/month</span>
+                                 </td>
+                                 <td className="py-4 px-6 text-center text-slate-500">Hidden in markup</td>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>
+                  </div>
+
+                  <div className="mt-8 text-center">
+                     <p className="text-slate-600 mb-4">Average family savings: <span className="font-bold text-teal-600">$400-800/month</span></p>
+                     <Button size="lg" onClick={() => onNavigate('client-signup')}>
+                        Start Saving Today
+                     </Button>
+                  </div>
+               </div>
+            </section>
+
+            {/* Service Area Map */}
+            <section className="py-20 bg-white">
+               <div className="max-w-5xl mx-auto px-4">
+                  <div className="text-center mb-12">
+                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-sm font-semibold mb-4">
+                        <MapPin className="w-4 h-4" />
+                        Now Serving Santa Clara County
+                     </div>
+                     <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                        Care available across Santa Clara County
+                     </h2>
+                     <p className="text-slate-600 max-w-2xl mx-auto">
+                        From San Jose to Palo Alto, we're bringing quality in-home care to families throughout the Bay Area.
+                     </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-8 items-center">
+                     {/* Map Visual */}
+                     <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-3xl p-8 border border-teal-100">
+                        <div className="aspect-square bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center relative overflow-hidden">
+                           {/* Stylized Map of Santa Clara County */}
+                           <svg viewBox="0 0 400 400" className="w-full h-full">
+                              {/* County outline - stylized */}
+                              <path 
+                                 d="M50 100 L150 50 L300 80 L350 200 L320 350 L200 380 L80 320 Z" 
+                                 fill="#f0fdfa" 
+                                 stroke="#14b8a6" 
+                                 strokeWidth="3"
+                              />
+                              {/* City markers */}
+                              <circle cx="200" cy="200" r="8" fill="#14b8a6" />
+                              <text x="200" y="190" textAnchor="middle" className="text-xs font-semibold fill-slate-700">San Jose</text>
+                              
+                              <circle cx="280" cy="150" r="6" fill="#0ea5e9" />
+                              <text x="280" y="140" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Milpitas</text>
+                              
+                              <circle cx="320" cy="220" r="6" fill="#0ea5e9" />
+                              <text x="320" y="235" textAnchor="middle" className="text-xs font-semibold fill-slate-700">San Jose</text>
+                              
+                              <circle cx="250" cy="280" r="6" fill="#0ea5e9" />
+                              <text x="250" y="295" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Los Gatos</text>
+                              
+                              <circle cx="150" cy="250" r="6" fill="#0ea5e9" />
+                              <text x="150" y="265" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Campbell</text>
+                              
+                              <circle cx="120" cy="150" r="6" fill="#0ea5e9" />
+                              <text x="120" y="140" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Santa Clara</text>
+                              
+                              <circle cx="180" cy="100" r="6" fill="#0ea5e9" />
+                              <text x="180" y="90" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Sunnyvale</text>
+                              
+                              <circle cx="260" cy="80" r="6" fill="#0ea5e9" />
+                              <text x="260" y="70" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Mountain View</text>
+                              
+                              <circle cx="330" cy="100" r="6" fill="#0ea5e9" />
+                              <text x="330" y="90" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Palo Alto</text>
+                              
+                              <circle cx="220" cy="150" r="6" fill="#0ea5e9" />
+                              <text x="220" y="140" textAnchor="middle" className="text-xs font-semibold fill-slate-700">Cupertino</text>
+                           </svg>
+                           
+                           {/* Legend */}
+                           <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                 <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+                                 <span className="text-slate-600">Main Hub</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                 <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                 <span className="text-slate-600">Service Area</span>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Cities List */}
+                     <div className="space-y-6">
+                        <div>
+                           <h3 className="text-xl font-bold text-slate-900 mb-4">Cities We Serve</h3>
+                           <div className="grid grid-cols-2 gap-3">
+                              {[
+                                 'San Jose',
+                                 'Santa Clara',
+                                 'Sunnyvale',
+                                 'Mountain View',
+                                 'Palo Alto',
+                                 'Cupertino',
+                                 'Los Gatos',
+                                 'Campbell',
+                                 'Milpitas',
+                                 'Saratoga',
+                                 'Los Altos',
+                                 'Morgan Hill'
+                              ].map((city) => (
+                                 <div key={city} className="flex items-center gap-2 text-slate-600">
+                                    <MapPin className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                                    <span>{city}</span>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="bg-teal-50 rounded-2xl p-6 border border-teal-100">
+                           <h4 className="font-semibold text-teal-900 mb-2">Don't see your city?</h4>
+                           <p className="text-teal-700 text-sm mb-4">
+                              We're expanding throughout the Bay Area. Contact us to check availability in your neighborhood.
+                           </p>
+                           <a 
+                              href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20do%20you%20serve%20my%20area?`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-teal-700 font-semibold hover:underline"
+                           >
+                              <MessageCircle className="w-4 h-4" />
+                              Ask Cara about your area
+                           </a>
+                        </div>
+                     </div>
                   </div>
                </div>
             </section>
 
             {/* Trust & Safety */}
-            <section className="py-24 bg-white">
+            <section className="py-20 bg-slate-900 text-white">
                <div className="max-w-4xl mx-auto px-4 text-center">
-                  <div className="inline-flex p-4 bg-teal-50 rounded-full mb-6">
-                     <ShieldCheck className="w-8 h-8 text-teal-600" />
+                  <div className="inline-flex p-4 bg-teal-500/20 rounded-full mb-6">
+                     <ShieldCheck className="w-8 h-8 text-teal-400" />
                   </div>
-                  <h2 className="text-3xl font-bold text-slate-900 mb-6">Safety is our obsession.</h2>
-                  <div className="grid md:grid-cols-2 gap-8 text-left max-w-2xl mx-auto">
-                     <ul className="space-y-4">
-                        <li className="flex items-start">
-                           <Heart className="w-5 h-5 text-teal-500 mr-3 mt-1 flex-shrink-0" />
-                           <span className="text-slate-600"><strong>Identity Verification:</strong> Every user is verified via Stripe & Checkr.</span>
-                        </li>
-                        <li className="flex items-start">
-                           <Heart className="w-5 h-5 text-teal-500 mr-3 mt-1 flex-shrink-0" />
-                           <span className="text-slate-600"><strong>Liability Insurance:</strong> $5M coverage for every booked shift.</span>
-                        </li>
-                     </ul>
-                     <ul className="space-y-4">
-                        <li className="flex items-start">
-                           <Heart className="w-5 h-5 text-teal-500 mr-3 mt-1 flex-shrink-0" />
-                           <span className="text-slate-600"><strong>Secure Payments:</strong> No cash exchanges. Everything is tracked.</span>
-                        </li>
-                        <li className="flex items-start">
-                           <Heart className="w-5 h-5 text-teal-500 mr-3 mt-1 flex-shrink-0" />
-                           <span className="text-slate-600"><strong>GPS Monitoring:</strong> Real-time check-ins ensure caregivers are on site.</span>
-                        </li>
-                     </ul>
+                  <h2 className="text-3xl font-bold mb-6">Safety is our obsession.</h2>
+                  <p className="text-slate-300 max-w-2xl mx-auto mb-12">
+                     We know you're trusting us with your loved ones. Here's how we earn that trust every day.
+                  </p>
+
+                  <div className="grid md:grid-cols-2 gap-6 text-left">
+                     {[
+                        { title: "Identity Verification", desc: "Every caregiver verified via Stripe & Checkr background checks" },
+                        { title: "Liability Insurance", desc: "$5M coverage through Bunker for every booked shift" },
+                        { title: "Secure Payments", desc: "No cash exchanges. All payments tracked and insured via Stripe" },
+                        { title: "GPS Monitoring", desc: "Real-time check-ins ensure caregivers are on site when they clock in" },
+                        { title: "Interview First", desc: "Meet your caregiver via video call before making any decisions" },
+                        { title: "24/7 Support", desc: "Cara and our team are always available for emergencies" }
+                     ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-4 p-6 bg-slate-800 rounded-2xl border border-slate-700">
+                           <CheckCircle className="w-6 h-6 text-teal-400 flex-shrink-0 mt-0.5" />
+                           <div>
+                              <h3 className="font-semibold mb-1">{item.title}</h3>
+                              <p className="text-slate-400 text-sm">{item.desc}</p>
+                           </div>
+                        </div>
+                     ))}
                   </div>
                </div>
             </section>
 
-            <footer className="bg-slate-50 py-12 border-t border-slate-100 text-center">
-               <p className="text-slate-500 mb-4">Ready to experience better care?</p>
-               <div className="flex justify-center gap-4">
-                  <button onClick={() => onNavigate('client-signup')} className="text-teal-600 font-bold hover:underline">Sign up as Family</button>
-                  <span className="text-slate-300">|</span>
-                  <button onClick={() => onNavigate('caregiver-signup')} className="text-orange-500 font-bold hover:underline">Sign up as Caregiver</button>
+            {/* Final CTA */}
+            <section className="py-20 bg-gradient-to-br from-teal-600 to-cyan-600 text-white">
+               <div className="max-w-3xl mx-auto px-4 text-center">
+                  <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to find the perfect care?</h2>
+                  <p className="text-xl text-teal-100 mb-10">
+                     Join hundreds of families in Santa Clara County who trust CareConnex for their loved ones.
+                  </p>
+                  <div className="flex flex-col sm:flex-row justify-center gap-4">
+                     <Button 
+                        size="lg" 
+                        className="bg-white text-teal-700 hover:bg-teal-50 shadow-xl"
+                        onClick={() => onNavigate('client-signup')}
+                     >
+                        Get Started Today
+                     </Button>
+                     <a 
+                        href={`https://wa.me/${caraWhatsAppNumber.replace(/\+/g, '')}?text=Hi%20Cara,%20I%27m%20ready%20to%20find%20care`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold transition-all"
+                     >
+                        <MessageCircle className="w-5 h-5" />
+                        Text Cara
+                     </a>
+                  </div>
                </div>
+            </section>
 
-               <div className="flex gap-6 justify-center mt-8 text-sm text-slate-400">
-                  <button onClick={() => setLegalModal('privacy')} className="hover:text-slate-600">Privacy Policy</button>
-                  <button onClick={() => setLegalModal('terms')} className="hover:text-slate-600">Terms of Service</button>
+            {/* Footer */}
+            <footer className="bg-slate-50 py-12 border-t border-slate-200">
+               <div className="max-w-4xl mx-auto px-4 text-center">
+                  <div className="flex justify-center gap-6 mb-6">
+                     <button onClick={() => onNavigate('client-signup')} className="text-teal-600 font-semibold hover:underline">Sign up as Family</button>
+                     <button onClick={() => onNavigate('caregiver-signup')} className="text-orange-500 font-semibold hover:underline">Sign up as Caregiver</button>
+                  </div>
+                  <div className="flex gap-6 justify-center text-sm text-slate-400">
+                     <button onClick={() => setLegalModal('privacy')} className="hover:text-slate-600">Privacy Policy</button>
+                     <button onClick={() => setLegalModal('terms')} className="hover:text-slate-600">Terms of Service</button>
+                     <button onClick={() => onNavigate('insurance')} className="hover:text-slate-600">Insurance</button>
+                  </div>
+                  <p className="mt-8 text-sm text-slate-400">
+                     © 2026 CareConnex. Serving Santa Clara County.
+                  </p>
                </div>
             </footer>
 

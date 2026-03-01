@@ -47,6 +47,9 @@ export * from './caraRailway';
 // Export Phase 2: Proactive Cron Jobs
 export * from './caraCron';
 
+// Export Encryption Functions (Server-side PII handling)
+export * from './encryption';
+
 // Export Phase 3: Advanced Intelligence
 export * from './caraMemory';
 export * from './caraCalendar';
@@ -57,8 +60,14 @@ export * from './caraFamily';
 export * from './caraAgentCore';
 export * from './caraWhatsApp';
 
+// Export new functions from ./cara/
+export { onTaskCreated } from './cara/tasks';
+
 // Export test data population
 export * from './populateTestData';
+
+// Export OpenAI Backend Functions (secure, server-side)
+export * from './openaiBackend';
 
 // Export Rate Limit cleanup (scheduled)
 import { cleanupRateLimits } from './rateLimit';

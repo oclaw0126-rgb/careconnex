@@ -3,6 +3,7 @@
  * Prevents abuse by limiting requests per user/IP
  */
 
+import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
 const db = admin.firestore();
@@ -144,6 +145,30 @@ export function getClientIdentifier(context: any, request?: any): string {
     
     return 'unknown';
 }
+
+/**
+ * Cloud Function: Check rate limit
+ * Called by client for distributed rate limiting
+ * Now extracts real IP address server-side for unauthenticated requests
+ */
+export const checkRateLimitHttp = functions.https.onCall(async (data, context) => {
+    // Allow unauthenticated calls for signup rate limiting
+    // (since users aren't logged in yet during signup)
+    const { key, config } = data;
+    
+    if (!key || !config) {
+        throw new functions.https.HttpsError('invalid-argument', 'Key and config are required');
+    }
+    
+    // Get client identifier with IP extraction from request headers
+    // SECURITY: This extracts the real IP server-side, preventing client spoofing
+    const rawRequest = (context as any).rawRequest;
+    const clientId = getClientIdentifier(context, rawRequest);
+    const fullKey = `${config.keyPrefix || 'rl:'}${key}_${clientId}`;
+    
+    const result = await checkRateLimit(fullKey, config);
+    return result;
+});
 
 /**
  * Cleanup old rate limit entries (run periodically)

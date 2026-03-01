@@ -10,6 +10,7 @@ import { ReviewModal } from './ReviewModal';
 import { SupportModal } from './SupportModal';
 import { CancellationModal } from './CancellationModal';
 import { HireCaregiverButton } from './ui/HireCaregiverButton';
+import { OutstandingInvoices } from './OutstandingInvoices';
 import { AddToastFunction, Appointment, Caregiver, ViewType, VideoInterview } from '../types';
 import { useSmartMatch } from '../hooks/useSmartMatch';
 import { dbService, authService } from '../services/api';
@@ -30,6 +31,7 @@ import { VideoInterviewRoom } from './VideoInterviewRoom';
 import { InterviewHistory } from './dashboard/InterviewHistory';
 import { CallSupportButton, CallSupportCard } from './CallSupport';
 import { CaregiverProfileModal } from './CaregiverProfileModal';
+import { VideoDiagnostic } from './VideoDiagnostic';
 
 // Family Command Center Components
 import { DailySummary } from './careJournal/DailySummary';
@@ -260,16 +262,35 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
    }, [reviewTarget, onReview, onShowToast]);
 
    const handleChatClick = useCallback(async (caregiver: Caregiver) => {
+      console.log('📝 [Chat] Starting chat with caregiver:', caregiver.id);
       setCreatingThreadId(Number(caregiver.id));
       try {
-         await dbService.createThread(
+         const currentUser = authService.getCurrentUser();
+         console.log('👤 [Chat] Current user:', currentUser?.uid);
+         
+         if (!currentUser) {
+            console.error('❌ [Chat] User not authenticated');
+            onShowToast("Please sign in to message", "error");
+            return;
+         }
+         
+         console.log('📨 [Chat] Creating thread...');
+         const safeAvatar = caregiver.imageUrl || caregiver.photo || '';
+         console.log('🖼️ [Chat] Using avatar:', safeAvatar ? 'Provided' : 'Default');
+         const threadId = await dbService.createThread(
             caregiver.id.toString(),
-            caregiver.name,
-            caregiver.imageUrl
+            caregiver.name || 'Unknown Caregiver',
+            safeAvatar
          );
+         console.log('✅ [Chat] Thread created:', threadId);
+         
+         console.log('🧭 [Chat] Navigating to client-inbox...');
          onNavigate('client-inbox');
-      } catch (e) {
-         onShowToast("Could not start chat", "error");
+      } catch (e: any) {
+         console.error('❌ [Chat] Failed:', e);
+         console.error('Error message:', e.message);
+         console.error('Error code:', e.code);
+         onShowToast(`Could not start chat: ${e.message || 'Unknown error'}`, "error");
       } finally {
          setCreatingThreadId(null);
       }
@@ -298,6 +319,10 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
    }, [caregivers, onNavigate, onShowToast]);
 
    const currentUser = authService.getCurrentUser();
+
+   const handleExpressBooking = useCallback(() => {
+      onNavigate('express-booking');
+   }, [onNavigate]);
 
    return (
       <div className="max-w-7xl mx-auto p-4 md:p-6 pb-24 animate-slide-in relative">
@@ -330,6 +355,17 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
             onShowToast={onShowToast}
          />
 
+         {/* Quick Actions - Express Booking */}
+         <div className="mb-6">
+            <button
+               onClick={handleExpressBooking}
+               className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all"
+            >
+               <Sparkles className="w-5 h-5" />
+               <span className="font-bold text-lg">Need Care Fast? Book in 2 Minutes →</span>
+            </button>
+         </div>
+
          {/* Family Command Center - Peace of Mind Score & Daily Summary */}
          <div className="mb-8 grid md:grid-cols-2 gap-6">
             {!journalLoading && (
@@ -346,33 +382,44 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                   />
                </>
             )}
-
-            {/* Daily Summary */}
-            {!journalLoading && (
-               <div className="mb-8">
-                  <DailySummary
-                     entries={careJournalEntries?.slice(0, 5) || []}
-                     seniorName={seniorProfile?.name || 'Your Loved One'}
-                     date={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                  />
-               </div>
-            )}
          </div>
 
-         {/* Phase 1: Live Care Updates - Real-time visibility during shifts */}
-         {appointments.some(a => a.status === 'in-progress' || a.status === 'confirmed') && (
+         {/* Daily Summary - Full width for better readability */}
+         {!journalLoading && (
             <div className="mb-8">
-               <LiveCareUpdates 
-                  appointmentId={appointments.find(a => a.status === 'in-progress' || a.status === 'confirmed')?.id || ''}
-                  clientId={currentUser?.uid || ''}
+               <DailySummary
+                  entries={careJournalEntries?.slice(0, 5) || []}
+                  seniorName={seniorProfile?.name || 'Your Loved One'}
+                  date={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                />
             </div>
          )}
 
+         {/* Phase 1: Live Care Updates - Real-time visibility during today's shifts only */}
+         {(() => {
+            const today = new Date().toLocaleDateString('en-CA');
+            const todaysActiveAppointments = appointments.filter(a => 
+               (a.status === 'in-progress' || a.status === 'confirmed') && 
+               a.date === today
+            );
+            return todaysActiveAppointments.length > 0 && (
+               <div className="mb-8">
+                  <LiveCareUpdates 
+                     appointmentId={todaysActiveAppointments[0]?.id || ''}
+                     clientId={currentUser?.uid || ''}
+                  />
+               </div>
+            );
+         })()}
+
          {/* Phase 2: Care Team - Dedicated caregiver team for continuity */}
          {currentUser?.uid && (
             <div className="mb-8">
-               <CareTeam clientId={currentUser.uid} />
+               <CareTeam 
+                  clientId={currentUser.uid} 
+                  appointments={appointments}
+                  seniorName={seniorProfile?.name}
+               />
             </div>
          )}
 
@@ -398,43 +445,18 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
          )}
 
          {/* Outstanding Invoices Section */}
-         {unpaidAppointments.length > 0 && (
-            <div className="mb-8">
-               <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2 text-orange-500" /> Outstanding Invoices
-               </h3>
-               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {unpaidAppointments.map(appt => (
-                     <div key={appt.id} className="bg-white border-l-4 border-orange-500 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-                        <div>
-                           <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-bold text-slate-900">{appt.caregiverName}</h4>
-                              <span className="text-orange-600 font-bold">${appt.cost}</span>
-                           </div>
-                           <p className="text-sm text-slate-500 mb-1">{appt.date} • {appt.time}</p>
-                           <Badge variant="warning" className="mb-4">Payment Due</Badge>
-                        </div>
-                        {(() => {
-                           const caregiver = caregivers.find(c => c.id.toString() === appt.caregiverId);
-                           return (
-                              <HireCaregiverButton
-                                 hourlyRate={appt.cost}
-                                 caregiverStripeId={caregiver?.stripeConnectId || caregiver?.stripeAccountId || ''}
-                                 onBeforeRedirect={() => stashPaymentId(appt.id)}
-                              />
-                           );
-                        })()}
-                     </div>
-                  ))}
-               </div>
-            </div>
-         )}
+         <OutstandingInvoices
+            appointments={unpaidAppointments}
+            caregivers={caregivers}
+            onStashPaymentId={stashPaymentId}
+         />
 
          <MatchCarousel
             caregivers={matchedCaregivers}
             loading={matchLoading}
             onChat={handleChatClick}
             onHire={setViewingCaregiver}
+            onScheduleInterview={setScheduleInterviewCaregiver}
             onSeeAll={() => setIsAiAgentOpen(true)}
             creatingThreadId={creatingThreadId}
          />
@@ -447,6 +469,13 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                   onJoinInterview={setActiveInterview}
                   onShowToast={onShowToast}
                />
+            </div>
+         )}
+
+         {/* Video Diagnostic - Help troubleshoot video issues */}
+         {showAdvancedFeatures && (
+            <div className="mb-8">
+               <VideoDiagnostic />
             </div>
          )}
 
@@ -466,19 +495,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
             </div>
          )}
 
-         {/* Advanced Features Toggle */}
-         <div className="mb-8 text-center">
-            <button
-               onClick={() => setShowAdvancedFeatures(!showAdvancedFeatures)}
-               className="text-teal-600 hover:text-teal-700 font-medium text-lg px-6 py-3 border-2 border-teal-200 rounded-xl hover:bg-teal-50 transition-colors"
-            >
-               {showAdvancedFeatures ? 'Hide Advanced Options ▲' : 'More Options ▼'}
-            </button>
-         </div>
-
-         {/* Scalable Browse Section - Hidden by default for simplicity */}
-         {showAdvancedFeatures && (
-         <div className="mb-24">
+         {/* Browse Caregivers - Always visible for easy discovery */}
+         <div className="mb-8">
             <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center">
                <User className="w-6 h-6 mr-3 text-teal-600" /> Explore All Caregivers
             </h3>
@@ -554,7 +572,16 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                         )}
 
                         {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto">
+                        <div className="grid grid-cols-3 gap-2 mt-auto">
+                           <Button
+                              size="sm"
+                              fullWidth
+                              variant="primary"
+                              onClick={() => setSelectedCaregiver(caregiver)}
+                              className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 font-semibold shadow-md"
+                           >
+                              Book
+                           </Button>
                            <Button
                               size="sm"
                               fullWidth
@@ -562,16 +589,16 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                               onClick={() => setViewingCaregiver(caregiver)}
                               className="border-2 border-teal-600 text-teal-700 hover:bg-teal-50 font-semibold"
                            >
-                              View Profile
+                              Profile
                            </Button>
                            <Button
                               size="sm"
                               fullWidth
-                              variant="primary"
-                              className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 font-semibold shadow-md"
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200 font-semibold"
                               onClick={() => setScheduleInterviewCaregiver(caregiver)}
                            >
-                              Interview
+                              Call
                            </Button>
                         </div>
                      </div>
@@ -591,7 +618,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
             </StaggerContainer>
 
             {hasMore && !browseLoading && (
-               <div className="flex justify-center">
+               <div className="flex justify-center mt-6">
                   <button
                      onClick={loadMoreCaregivers}
                      disabled={browseLoading}
@@ -603,7 +630,16 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                </div>
             )}
          </div>
-         )} {/* End showAdvancedFeatures */}
+
+         {/* Advanced Features Toggle - Video/Interview options only */}
+         <div className="mb-8 text-center">
+            <button
+               onClick={() => setShowAdvancedFeatures(!showAdvancedFeatures)}
+               className="text-teal-600 hover:text-teal-700 font-medium text-lg px-6 py-3 border-2 border-teal-200 rounded-xl hover:bg-teal-50 transition-colors"
+            >
+               {showAdvancedFeatures ? 'Hide Advanced Options ▲' : 'More Options ▼'}
+            </button>
+         </div>
 
          {/* Support / Help Section */}
          <div className="flex justify-center mb-8">
@@ -614,16 +650,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
                <HelpCircle className="w-4 h-4" /> Need help? Report an issue
             </button>
          </div>
-
-         {/* Floating Find Caregiver Button (Senior-Friendly) */}
-         <button
-            onClick={() => setIsSimpleSearchOpen(true)}
-            id="find-caregiver-trigger"
-            className="fixed bottom-28 right-4 md:right-8 bg-gradient-to-r from-teal-600 to-blue-600 text-white px-6 py-4 rounded-full shadow-2xl hover:from-teal-700 hover:to-blue-700 transition-all hover:scale-105 z-[60] flex items-center gap-3 group"
-         >
-            <Sparkles className="w-7 h-7 text-white group-hover:animate-pulse" />
-            <span className="font-bold text-xl">Find a Caregiver</span>
-         </button>
 
          {/* Modals */}
          {isJobModalOpen && (
@@ -759,6 +785,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
             onClose={() => setIsSimpleSearchOpen(false)}
             caregivers={caregivers}
             onSelectCaregiver={setSelectedCaregiver}
+            onViewProfile={setViewingCaregiver}
+            onScheduleInterview={setScheduleInterviewCaregiver}
             seniorProfile={seniorProfile}
          />
 
@@ -771,6 +799,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onNavigate }) 
             }}
             caregivers={matchedCaregivers.length > 0 ? matchedCaregivers : caregivers}
             onBookCaregiver={setSelectedCaregiver}
+            onViewProfile={setViewingCaregiver}
+            onScheduleInterview={setScheduleInterviewCaregiver}
             initialQuery={initialQuery}
             seniorProfile={seniorProfile}
             previousBookings={appointments}

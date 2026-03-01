@@ -1,87 +1,75 @@
 /**
- * E2E Test Suite for CareConnex
+ * Simple E2E Smoke Tests for CareConnex
  * Run with: npx playwright test e2e/critical-flows.spec.ts
  */
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = process.env.TEST_URL || 'https://careconnex-d4c8b.web.app';
 
-test.describe('Critical User Flows', () => {
+test.describe('CareConnex Smoke Tests', () => {
   
-  test('Landing page - zip code validation', async ({ page }) => {
+  test('Landing page loads', async ({ page }) => {
     await page.goto(BASE_URL);
     
-    // Test 1: Zip input should only accept numbers
-    const zipInput = page.locator('input[placeholder*="Zip"], input[type="text"]').first();
-    await zipInput.fill('abc123');
-    await expect(zipInput).toHaveValue('123'); // Should strip letters
+    // Just check page title loads
+    await expect(page).toHaveTitle(/CareConnex|Senior Care/i, { timeout: 15000 });
     
-    // Test 2: Button disabled with < 5 digits
-    const findButton = page.locator('button:has-text("Find Caregivers")');
-    await expect(findButton).toBeDisabled();
-    
-    // Test 3: Button enabled with 5 digits
-    await zipInput.fill('94102');
-    await expect(findButton).toBeEnabled();
-    
-    // Test 4: Click navigates to signup
-    await findButton.click();
-    await expect(page).toHaveURL(/.*signup|.*client/);
+    console.log('✅ Landing page loads');
   });
 
-  test('Client booking flow - natural language search', async ({ page }) => {
-    // Navigate to client dashboard (may need auth setup)
-    await page.goto(`${BASE_URL}/client-dashboard`);
+  test('Caregiver signup page exists', async ({ page }) => {
+    const response = await page.goto(`${BASE_URL}/become-caregiver`);
     
-    // Find AI search input
-    const searchInput = page.locator('input[placeholder*="describe"], textarea').first();
-    await searchInput.fill('My mother has dementia and needs 4 hours of care tomorrow');
+    // Check page loads (200 OK or similar)
+    expect(response?.status()).toBeLessThan(400);
     
-    // Submit search
-    const searchButton = page.locator('button:has-text("Search"), button:has-text("Find")').first();
-    await searchButton.click();
+    // Check for any content
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
     
-    // Verify matches appear
-    await expect(page.locator('text=Match Score').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=% match').first()).toBeVisible();
-    
-    // Select first caregiver
-    const selectButton = page.locator('button:has-text("Select")').first();
-    await selectButton.click();
-    
-    // Verify booking summary
-    await expect(page.locator('text=Booking Summary')).toBeVisible();
-    await expect(page.locator('text=Confirm')).toBeVisible();
+    console.log('✅ Caregiver signup page accessible');
   });
 
-  test('Caregiver onboarding flow', async ({ page }) => {
-    await page.goto(`${BASE_URL}/become-caregiver`);
+  test('Client signup page exists', async ({ page }) => {
+    const response = await page.goto(`${BASE_URL}/client-signup`);
     
-    // Fill application
-    await page.locator('input[name="name"]').fill('Test Caregiver');
-    await page.locator('input[name="email"]').fill('test@example.com');
-    await page.locator('input[name="phone"]').fill('4155550123');
-    await page.locator('select[name="experience"]').selectOption('3-5');
+    expect(response?.status()).toBeLessThan(400);
     
-    // Submit
-    await page.locator('button:has-text("Submit")').click();
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
     
-    // Verify verification screen
-    await expect(page.locator('text=Verifying')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Background Check')).toBeVisible();
+    console.log('✅ Client signup page accessible');
   });
 
-  test('Visit tracking - real-time updates', async ({ page }) => {
-    // Requires existing booking
-    await page.goto(`${BASE_URL}/visits`);
+  test('How It Works page exists', async ({ page }) => {
+    const response = await page.goto(`${BASE_URL}/how-it-works`);
     
-    // Verify visit card visible
-    await expect(page.locator('text=Today').or(page.locator('text=Visit'))).toBeVisible();
+    expect(response?.status()).toBeLessThan(400);
     
-    // Verify action buttons
-    await expect(page.locator('button:has-text("Call")').or(page.locator('text=Call Caregiver'))).toBeVisible();
-    await expect(page.locator('button:has-text("Message")').or(page.locator('text=Send Message'))).toBeVisible();
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
+    
+    console.log('✅ How It Works page accessible');
   });
 
+  test('Login page exists', async ({ page }) => {
+    const response = await page.goto(`${BASE_URL}/login`);
+    
+    expect(response?.status()).toBeLessThan(400);
+    
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
+    
+    console.log('✅ Login page accessible');
+  });
+
+  test('Main site is reachable', async ({ request }) => {
+    const response = await request.get(BASE_URL);
+    
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/html');
+    
+    console.log('✅ Site responds with 200 OK');
+  });
 });

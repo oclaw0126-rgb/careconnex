@@ -1,17 +1,21 @@
 import React from 'react';
 import { Caregiver } from '../../types';
-import { Star, MapPin, Clock } from 'lucide-react';
+import { Star, MapPin, Clock, Video } from 'lucide-react';
 import { DEFAULT_CAREGIVER_AVATAR } from '../../constants';
 
 interface InlineCaregiverCardProps {
     caregiver: Caregiver;
     onBook: (caregiverId: string) => void;
+    onViewProfile?: (caregiver: Caregiver) => void;
+    onScheduleInterview?: (caregiver: Caregiver) => void;
     compact?: boolean;
 }
 
 export const InlineCaregiverCard: React.FC<InlineCaregiverCardProps> = ({
     caregiver,
     onBook,
+    onViewProfile,
+    onScheduleInterview,
     compact = true
 }) => {
     return (
@@ -85,18 +89,33 @@ export const InlineCaregiverCard: React.FC<InlineCaregiverCardProps> = ({
                     </div>
                 </div>
 
-                {/* Book Button */}
-                <button
-                    onClick={() => onBook(caregiver.id)}
-                    className="
-            w-full mt-3 px-4 py-2 bg-teal-600 text-white rounded-lg
-            font-medium hover:bg-teal-700 transition-colors
-            flex items-center justify-center gap-2
-          "
-                >
-                    <Clock className="w-4 h-4" />
-                    Book Now
-                </button>
+                {/* Action Buttons */}
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                    <button
+                        onClick={() => onBook(caregiver.id)}
+                        className="px-2 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors flex items-center justify-center gap-1"
+                    >
+                        <Clock className="w-4 h-4" />
+                        Book
+                    </button>
+                    {onViewProfile && (
+                        <button
+                            onClick={() => onViewProfile(caregiver)}
+                            className="px-2 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                        >
+                            Profile
+                        </button>
+                    )}
+                    {onScheduleInterview && (
+                        <button
+                            onClick={() => onScheduleInterview(caregiver)}
+                            className="px-2 py-2 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors flex items-center justify-center gap-1"
+                        >
+                            <Video className="w-4 h-4" />
+                            Call
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

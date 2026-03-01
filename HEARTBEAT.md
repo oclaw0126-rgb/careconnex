@@ -1,5 +1,6 @@
-# HEARTBEAT.md
+# HEARTBEAT.md - Periodic Tasks
 
-# Keep this file empty (or with only comments) to skip heartbeat API calls.
-
-# Add tasks below when you want the agent to check something periodically.
+## Hourly Check
+- **Schedule:** `0 * * * *` (every hour)
+- **Model:** google/gemini-2.0-flash
+- **Task:** Check system status and any pending alerts

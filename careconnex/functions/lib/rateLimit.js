@@ -37,10 +37,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RATE_LIMITS = void 0;
+exports.checkRateLimitHttp = exports.RATE_LIMITS = void 0;
 exports.checkRateLimit = checkRateLimit;
 exports.getClientIdentifier = getClientIdentifier;
 exports.cleanupRateLimits = cleanupRateLimits;
+const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const db = admin.firestore();
 // Default configs for different endpoints
@@ -157,6 +158,26 @@ function getClientIdentifier(context, request) {
     }
     return 'unknown';
 }
+/**
+ * Cloud Function: Check rate limit
+ * Called by client for distributed rate limiting
+ * Now extracts real IP address server-side for unauthenticated requests
+ */
+exports.checkRateLimitHttp = functions.https.onCall(async (data, context) => {
+    // Allow unauthenticated calls for signup rate limiting
+    // (since users aren't logged in yet during signup)
+    const { key, config } = data;
+    if (!key || !config) {
+        throw new functions.https.HttpsError('invalid-argument', 'Key and config are required');
+    }
+    // Get client identifier with IP extraction from request headers
+    // SECURITY: This extracts the real IP server-side, preventing client spoofing
+    const rawRequest = context.rawRequest;
+    const clientId = getClientIdentifier(context, rawRequest);
+    const fullKey = `${config.keyPrefix || 'rl:'}${key}_${clientId}`;
+    const result = await checkRateLimit(fullKey, config);
+    return result;
+});
 /**
  * Cleanup old rate limit entries (run periodically)
  */

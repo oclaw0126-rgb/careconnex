@@ -189,6 +189,11 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ onNaviga
       try {
          if ('geolocation' in navigator) {
             navigator.geolocation.getCurrentPosition(async (position) => {
+               if (position.coords.accuracy > 100) {
+                  onShowToast("GPS signal weak. Please step outside or connect to Wi-Fi for better signal.", 'error');
+                  setIsLoadingEvv(false);
+                  return;
+               }
                const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
                await dbService.startVisit(apptId, loc);
                onShowToast("Clocked In! Visit tracking active. Family has been notified.", 'success');
@@ -223,21 +228,41 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ onNaviga
 
    const handleClockOut = async (apptId: string) => {
       setIsLoadingEvv(true);
-      try {
-         await dbService.endVisit(apptId);
-         onShowToast("Clocked Out. Please complete the visit check-in.", 'success');
-         setIsLoadingEvv(false);
+      
+      const processClockOut = async (location?: { lat: number, lng: number }) => {
+         try {
+            await dbService.endVisit(apptId, location);
+            onShowToast("Clocked Out. Please complete the visit check-in.", 'success');
+            setIsLoadingEvv(false);
 
-         // Show care journal form after clocking out - use functional ref to get latest appointments
-         const completedAppt = appointments.find(a => 
-            currentUser && a.caregiverId.toString() === currentUser.uid && a.id === apptId
-         );
-         if (completedAppt) {
-            setCompletedAppointment(completedAppt);
-            setShowCareJournal(true);
+            // Show care journal form after clocking out - use functional ref to get latest appointments
+            const completedAppt = appointments.find(a => 
+               currentUser && a.caregiverId.toString() === currentUser.uid && a.id === apptId
+            );
+            if (completedAppt) {
+               setCompletedAppointment(completedAppt);
+               setShowCareJournal(true);
+            }
+         } catch (e) {
+            onShowToast("Failed to clock out.", 'error');
+            setIsLoadingEvv(false);
          }
-      } catch (e) {
-         onShowToast("Failed to clock out.", 'error');
+      };
+
+      if ('geolocation' in navigator) {
+         navigator.geolocation.getCurrentPosition(
+            (position) => {
+               const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
+               processClockOut(loc);
+            },
+            (error) => {
+               console.error(error);
+               onShowToast("GPS Location required to Clock Out.", 'error');
+               setIsLoadingEvv(false);
+            }
+         );
+      } else {
+         onShowToast("Geolocation not supported.", 'error');
          setIsLoadingEvv(false);
       }
    };

@@ -8,13 +8,17 @@ import { dbService, authService } from '../services/api';
 interface InboxViewProps {
   userType: 'client' | 'caregiver';
   onNavigate: (view: ViewType) => void;
+  onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onScheduleVideoCall?: (caregiverId: string, caregiverName: string) => void;
+  onViewProfile?: (caregiverId: string) => void;
 }
 
-export const InboxView: React.FC<InboxViewProps> = ({ userType, onNavigate }) => {
+export const InboxView: React.FC<InboxViewProps> = ({ userType, onNavigate, onShowToast, onScheduleVideoCall, onViewProfile }) => {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [showMenu, setShowMenu] = useState(false);
 
   const isClient = userType === 'client';
   const themeColor = isClient ? 'teal' : 'orange';
@@ -54,7 +58,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ userType, onNavigate }) =>
     } catch (e) {
         console.error("Message send failed", e);
         setInputText(textToSend); // Restore message so user can retry
-        onShowToast("Failed to send message. Please try again.", 'error');
+        onShowToast?.("Failed to send message. Please try again.", 'error');
     }
   };
 
@@ -131,10 +135,71 @@ export const InboxView: React.FC<InboxViewProps> = ({ userType, onNavigate }) =>
                    </p>
                  </div>
                </div>
-               <div className="flex gap-2">
-                 <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full"><Phone className="w-5 h-5" /></button>
-                 <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full"><Video className="w-5 h-5" /></button>
-                 <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full"><MoreVertical className="w-5 h-5" /></button>
+               <div className="flex gap-2 relative">
+                 <button 
+                   onClick={() => onShowToast?.('Voice calls coming soon!', 'info')}
+                   className="p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-600 rounded-full transition-colors"
+                   title="Voice Call"
+                 >
+                   <Phone className="w-5 h-5" />
+                 </button>
+                 <button 
+                   onClick={() => {
+                     if (activeThread?.contactId && onScheduleVideoCall) {
+                       onScheduleVideoCall(activeThread.contactId, activeThread.contactName);
+                     } else {
+                       onShowToast?.('Video call feature requires scheduling', 'info');
+                     }
+                   }}
+                   className="p-2 text-slate-400 hover:bg-slate-100 hover:text-purple-600 rounded-full transition-colors"
+                   title="Video Call"
+                 >
+                   <Video className="w-5 h-5" />
+                 </button>
+                 <div className="relative">
+                   <button 
+                     onClick={() => setShowMenu(!showMenu)}
+                     className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+                     title="More Options"
+                   >
+                     <MoreVertical className="w-5 h-5" />
+                   </button>
+                   {showMenu && (
+                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
+                       <button
+                         onClick={() => {
+                           setShowMenu(false);
+                           if (activeThread?.contactId && onViewProfile) {
+                             onViewProfile(activeThread.contactId);
+                           } else {
+                             onShowToast?.('View profile feature coming soon', 'info');
+                           }
+                         }}
+                         className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                       >
+                         View Profile
+                       </button>
+                       <button
+                         onClick={() => {
+                           setShowMenu(false);
+                           onShowToast?.('Block feature coming soon', 'info');
+                         }}
+                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
+                       >
+                         Block User
+                       </button>
+                       <button
+                         onClick={() => {
+                           setShowMenu(false);
+                           onShowToast?.('Report feature coming soon', 'info');
+                         }}
+                         className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                       >
+                         Report
+                       </button>
+                     </div>
+                   )}
+                 </div>
                </div>
             </div>
 

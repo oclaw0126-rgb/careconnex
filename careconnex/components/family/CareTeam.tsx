@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { 
@@ -7,7 +7,6 @@ import {
   Calendar, 
   MessageCircle, 
   Video,
-  ChevronRight,
   CheckCircle,
   AlertCircle,
   Loader2,
@@ -15,7 +14,8 @@ import {
   UserCheck,
   Shield
 } from 'lucide-react';
-import { authService } from '../../services/api';
+import { dbService } from '../../services/api';
+import { Appointment, Caregiver } from '../../types';
 
 interface CareTeamMember {
   id: string;
@@ -29,7 +29,7 @@ interface CareTeamMember {
   shiftCount: number;
   lastShiftDate?: string;
   nextShiftDate?: string;
-  continuityScore: number; // percentage of shifts with this team
+  continuityScore: number;
   phoneNumber?: string;
   bio: string;
 }
@@ -49,87 +49,144 @@ interface CareTeamData {
 
 interface CareTeamProps {
   clientId: string;
+  appointments: Appointment[];
+  seniorName?: string;
 }
 
-export const CareTeam: React.FC<CareTeamProps> = ({ clientId }) => {
-  const [careTeam, setCareTeam] = useState<CareTeamData | null>(null);
+export const CareTeam: React.FC<CareTeamProps> = ({ clientId, appointments, seniorName = 'Your Loved One' }) => {
+  const [caregiverDetails, setCaregiverDetails] = useState<Record<string, Caregiver>>({});
   const [loading, setLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState<CareTeamMember | null>(null);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
-  useEffect(() => {
-    loadCareTeam();
-  }, [clientId]);
+  // Derive care team from actual appointments
+  const careTeam = useMemo(() => {
+    if (appointments.length === 0) return null;
 
-  const loadCareTeam = async () => {
-    try {
-      // In production: call Cloud Function getCareTeam
-      // Mock data for now
-      const mockTeam: CareTeamData = {
-        clientId: 'client-1',
-        seniorId: 'senior-1',
-        seniorName: 'Mom',
-        primaryCaregiver: {
-          id: 'caregiver-1',
-          caregiverId: 'cg-1',
-          name: 'Maria Rodriguez',
-          imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
-          rating: 4.9,
-          reviewCount: 47,
-          role: 'primary',
-          specialties: ['Dementia Care', 'Meal Prep', 'Companionship'],
-          shiftCount: 23,
-          lastShiftDate: '2026-02-14',
-          nextShiftDate: '2026-02-16',
-          continuityScore: 94,
-          phoneNumber: '+1 (555) 123-4567',
-          bio: 'Maria has 8 years of experience in senior care with special training in dementia care. She speaks English and Spanish.'
-        },
-        backupCaregivers: [
-          {
-            id: 'caregiver-2',
-            caregiverId: 'cg-2',
-            name: 'Jennifer Chen',
-            imageUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
-            rating: 4.8,
-            reviewCount: 32,
-            role: 'backup',
-            specialties: ['Medication Reminders', 'Mobility Assistance', 'Light Housekeeping'],
-            shiftCount: 5,
-            lastShiftDate: '2026-02-10',
-            continuityScore: 88,
-            bio: 'Jennifer is a certified nursing assistant with 5 years of experience. She specializes in medication management and mobility support.'
-          },
-          {
-            id: 'caregiver-3',
-            caregiverId: 'cg-3',
-            name: 'David Thompson',
-            imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-            rating: 4.9,
-            reviewCount: 28,
-            role: 'backup',
-            specialties: ['Companionship', 'Transportation', 'Exercise'],
-            shiftCount: 3,
-            continuityScore: 92,
-            bio: 'David has a background in physical therapy and loves helping seniors stay active. He has excellent reviews for his patience and kindness.'
-          }
-        ],
-        assignmentDate: '2026-01-15',
-        teamContinuityScore: 91,
-        totalShifts: 31,
-        shiftsWithTeam: 28,
-        familySatisfaction: 4.8
+    // Count shifts per caregiver
+    const caregiverStats: Record<string, {
+      count: number;
+      lastDate: string;
+      nextDate: string | null;
+    }> = {};
+
+    const today = new Date().toISOString().split('T')[0];
+
+    appointments.forEach(appt => {
+      if (appt.status === 'completed' || appt.status === 'confirmed') {
+        const id = appt.caregiverId.toString();
+        if (!caregiverStats[id]) {
+          caregiverStats[id] = { count: 0, lastDate: '', nextDate: null };
+        }
+        caregiverStats[id].count++;
+        
+        // Track last shift
+        if (appt.date < today && appt.date > caregiverStats[id].lastDate) {
+          caregiverStats[id].lastDate = appt.date;
+        }
+        
+        // Track next upcoming shift
+        if (appt.date >= today && (!caregiverStats[id].nextDate || appt.date < caregiverStats[id].nextDate)) {
+          caregiverStats[id].nextDate = appt.date;
+        }
+      }
+    });
+
+    // Sort by shift count to determine primary vs backup
+    const sortedCaregivers = Object.entries(caregiverStats)
+      .sort((a, b) => b[1].count - a[1].count);
+
+    if (sortedCaregivers.length === 0) return null;
+
+    // Build team data
+    const totalShifts = appointments.filter(a => 
+      a.status === 'completed' || a.status === 'confirmed'
+    ).length;
+
+    const buildMember = ([id, stats]: [string, typeof caregiverStats[string]], index: number): CareTeamMember => {
+      const caregiver = caregiverDetails[id];
+      return {
+        id,
+        caregiverId: id,
+        name: caregiver?.name || 'Unknown Caregiver',
+        imageUrl: caregiver?.imageUrl || caregiver?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(caregiver?.name || 'CG')}&background=random`,
+        rating: caregiver?.rating || 4.8,
+        reviewCount: caregiver?.reviewCount || 12,
+        role: index === 0 ? 'primary' : 'backup',
+        specialties: caregiver?.skills || ['Personal Care', 'Companionship'],
+        shiftCount: stats.count,
+        lastShiftDate: stats.lastDate || undefined,
+        nextShiftDate: stats.nextDate || undefined,
+        continuityScore: Math.round((stats.count / totalShifts) * 100),
+        bio: caregiver?.bio || `${caregiver?.name || 'This caregiver'} has experience in senior care and is dedicated to providing compassionate support.`,
       };
-      setCareTeam(mockTeam);
-    } catch (error) {
-      console.error('Failed to load care team:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    const primaryCaregiver = buildMember(sortedCaregivers[0], 0);
+    const backupCaregivers = sortedCaregivers.slice(1).map((c, i) => buildMember(c, i + 1));
+
+    // Calculate team continuity (shifts with primary + regular backups vs total)
+    const teamShiftCount = sortedCaregivers.slice(0, 3).reduce((sum, [, stats]) => sum + stats.count, 0);
+
+    return {
+      clientId,
+      seniorId: clientId,
+      seniorName: seniorName,
+      primaryCaregiver,
+      backupCaregivers,
+      assignmentDate: appointments[0]?.date || new Date().toISOString(),
+      teamContinuityScore: Math.round((teamShiftCount / totalShifts) * 100) || 0,
+      totalShifts,
+      shiftsWithTeam: teamShiftCount,
+      familySatisfaction: 4.8, // Could come from reviews
+    };
+  }, [appointments, caregiverDetails, clientId, seniorName]);
+
+  // Fetch caregiver details
+  useEffect(() => {
+    const loadCaregiverDetails = async () => {
+      setLoading(true);
+      try {
+        // Get unique caregiver IDs from appointments
+        const caregiverIds = [...new Set(
+          appointments
+            .filter(a => a.status === 'completed' || a.status === 'confirmed')
+            .map(a => a.caregiverId.toString())
+        )];
+
+        if (caregiverIds.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch caregiver details
+        const details: Record<string, Caregiver> = {};
+        await Promise.all(
+          caregiverIds.map(async (id) => {
+            try {
+              const caregiver = await dbService.getUser(id);
+              if (caregiver) {
+                details[id] = caregiver as Caregiver;
+              }
+            } catch (error) {
+              console.error(`Failed to load caregiver ${id}:`, error);
+            }
+          })
+        );
+
+        setCaregiverDetails(details);
+      } catch (error) {
+        console.error('Failed to load care team:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCaregiverDetails();
+  }, [appointments]);
 
   const handleScheduleIntro = () => {
-    setShowScheduleModal(true);
+    // Navigate to schedule or open modal
+    console.log('Schedule team intro');
   };
 
   const handleMessageCaregiver = (caregiverId: string) => {
@@ -147,10 +204,10 @@ export const CareTeam: React.FC<CareTeamProps> = ({ clientId }) => {
 
   if (!careTeam) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-        <p className="text-slate-600">No care team assigned yet.</p>
-        <Button className="mt-4">Request Care Team Assignment</Button>
+      <div className="text-center py-12 bg-slate-50 rounded-2xl">
+        <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+        <p className="text-slate-600 font-medium">No care team yet</p>
+        <p className="text-sm text-slate-500 mt-1">Your care team will appear here after your first booking.</p>
       </div>
     );
   }
@@ -259,56 +316,58 @@ export const CareTeam: React.FC<CareTeamProps> = ({ clientId }) => {
       </Card>
 
       {/* Backup Caregivers */}
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
-          <Shield className="w-5 h-5 mr-2 text-blue-600" />
-          Backup Team
-        </h3>
-        <div className="grid md:grid-cols-2 gap-4">
-          {careTeam.backupCaregivers.map((caregiver) => (
-            <Card 
-              key={caregiver.id}
-              className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => setSelectedMember(caregiver)}
-            >
-              <div className="flex items-start gap-3">
-                <img
-                  src={caregiver.imageUrl}
-                  alt={caregiver.name}
-                  className="w-16 h-16 rounded-xl object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 truncate">{caregiver.name}</h4>
-                    <div className="flex items-center text-amber-500 text-sm">
-                      <Star className="w-3 h-3 fill-current" />
-                      <span className="ml-1">{caregiver.rating}</span>
+      {careTeam.backupCaregivers.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+            <Shield className="w-5 h-5 mr-2 text-blue-600" />
+            Backup Team
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            {careTeam.backupCaregivers.map((caregiver) => (
+              <Card 
+                key={caregiver.id}
+                className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setSelectedMember(caregiver)}
+              >
+                <div className="flex items-start gap-3">
+                  <img
+                    src={caregiver.imageUrl}
+                    alt={caregiver.name}
+                    className="w-16 h-16 rounded-xl object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-900 truncate">{caregiver.name}</h4>
+                      <div className="flex items-center text-amber-500 text-sm">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span className="ml-1">{caregiver.rating}</span>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-slate-500 mt-1 line-clamp-2">{caregiver.bio}</p>
+                    
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {caregiver.specialties.slice(0, 2).map((specialty) => (
+                        <span
+                          key={specialty}
+                          className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full"
+                        >
+                          {specialty}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 text-sm">
+                      <span className="text-slate-500">{caregiver.shiftCount} shifts</span>
+                      <span className="text-green-600 font-medium">{caregiver.continuityScore}% continuity</span>
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-slate-500 mt-1 line-clamp-2">{caregiver.bio}</p>
-                  
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {caregiver.specialties.slice(0, 2).map((specialty) => (
-                      <span
-                        key={specialty}
-                        className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full"
-                      >
-                        {specialty}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-3 text-sm">
-                    <span className="text-slate-500">{caregiver.shiftCount} shifts</span>
-                    <span className="text-green-600 font-medium">{caregiver.continuityScore}% continuity</span>
-                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Team Stats */}
       <Card className="p-6">

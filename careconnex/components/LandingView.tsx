@@ -6,13 +6,14 @@ import { SEO, generateOrganizationSchema, generateServiceSchema } from './SEO';
 
 // Sub-components
 import { HeroSection } from './landing/HeroSection';
-// import { TrustStrip } from './landing/TrustStrip';  // Removed - logos not verified
+import { PartnerLogos } from './landing/PartnerLogos';
+import { AgencyComparison } from './landing/AgencyComparison';
+import { ServiceAreaMap } from './landing/ServiceAreaMap';
 import { HowItWorksSection } from './landing/HowItWorksSection';
 import { FeaturesSection } from './landing/FeaturesSection';
 import { CaregiverSection } from './landing/CaregiverSection';
 import { Footer } from './landing/Footer';
 import { LoginModal } from './landing/LoginModal';
-import { AffordabilitySection } from './landing/AffordabilitySection';
 import { TestimonialsSection } from './landing/TestimonialsSection';
 import { FAQSection } from './landing/FAQSection';
 import { MobileStickyCTA } from './landing/MobileStickyCTA';
@@ -113,8 +114,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
 
          <main className="flex-grow">
             <HeroSection onNavigate={onNavigate} />
-            {/* TrustStrip removed - logos not verified */}
-            <AffordabilitySection onNavigate={onNavigate} />
+            <PartnerLogos />
+            <AgencyComparison onNavigate={onNavigate} />
+            <ServiceAreaMap />
             <HowItWorksSection onNavigate={onNavigate} />
             <FeaturesSection onNavigate={onNavigate} />
             <TestimonialsSection onNavigate={onNavigate} />

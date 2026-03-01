@@ -104,7 +104,8 @@ exports.connectCaraAgent = functions.https.onRequest(async (req, res) => {
             status: 'active'
         });
         // 4. Send welcome message via Railway Cara
-        const RAILWAY_URL = 'https://careconnex-production.up.railway.app';
+        // BUG FIX: Use environment variable instead of hard-coded URL
+        const RAILWAY_URL = process.env.RAILWAY_URL || 'https://careconnex-production.up.railway.app';
         const welcomeMessage = messagingPreference === 'whatsapp'
             ? `👋 Hi ${(name === null || name === void 0 ? void 0 : name.split(' ')[0]) || 'there'}! I'm Cara, your CareConnex care coordinator.\n\nI can help you:\n• Find caregivers in ${zipCode || 'your area'}\n• Schedule interviews\n• Get care updates\n• Book appointments\n\nWhat type of care do you need? (e.g., companionship, dementia care, mobility assistance)`
             : `Hi ${(name === null || name === void 0 ? void 0 : name.split(' ')[0]) || 'there'}! I'm Cara from CareConnex. I'm here to help you find the perfect caregiver. What care do you need?`;

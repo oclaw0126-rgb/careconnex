@@ -63,16 +63,12 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                 {/* Header */}
                 <div className="text-center max-w-3xl mx-auto mb-16">
-                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 text-sm font-medium mb-6">
-                        <Star className="w-4 h-4 mr-2 text-orange-400 fill-current" />
-                        Trusted by 50,000+ Families
-                    </div>
                     <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
                         Loved by Families.<br />
                         <span className="text-teal-600">Trusted by Caregivers.</span>
                     </h2>
                     <p className="text-xl text-slate-600">
-                        Real stories from real families who found the perfect care match.
+                        Real stories from families who found the perfect care match.
                     </p>
                 </div>
 

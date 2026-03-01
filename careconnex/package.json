@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "deploy": "firebase deploy",
     "test": "vitest",
-    "icons": "node scripts/generate-icons.cjs"
+    "icons": "node scripts/generate-icons.cjs",
+    "migrate:predictive": "node scripts/run-migration.mjs",
+    "migrate:predictive:dry": "node --env-file=.env scripts/run-migration.mjs"
   },
   "dependencies": {
     "@google/genai": "latest",
@@ -29,6 +31,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/react": "^16.3.0",
     "@types/crypto-js": "^4.2.2",

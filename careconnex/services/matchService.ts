@@ -1,5 +1,6 @@
 import { Caregiver, Senior, MatchFeedback } from '../types';
 import { availabilityService } from './availabilityService';
+import { getPredictiveFactors, generatePredictiveReasoning, getBatchPredictiveFactors } from './predictiveMatchingOptimized';
 
 // Haversine Formula for real distance
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -40,7 +41,8 @@ const WEIGHTS = {
     reliability: 0.2,  // 20% of reliability score (0-100)
     verified: 10,      // Verified bonus
     rating: 0.5,       // 0.5 points per star
-    experience: 5      // Per year of experience (max 25)
+    experience: 5,     // Per year of experience (max 25)
+    retention: 20      // NEW: Client retention/rebooking bonus (up to 20 pts)
 };
 
 // Score caps
@@ -72,7 +74,8 @@ export const matchService = {
             requestedDate?: Date;
             requestedTime?: string;
             requestedDuration?: number;
-        }
+        },
+        preCalculatedFactors?: any
     ): Promise<Caregiver | null> => {
         const reasons: string[] = [];
         const flags: string[] = [];
@@ -285,6 +288,21 @@ export const matchService = {
             }
         }
 
+        // --- STEP 9.5: RETENTION/REBOOKING SCORE (NEW) ---
+        // Boost caregivers that families stick with
+        const retentionRate = caregiver.retentionRate || caregiver.reliabilityScore || 0;
+        if (retentionRate > 0) {
+            // Scale retention rate (0-100) to score bonus (0-20)
+            const retentionBonus = Math.round((retentionRate / 100) * WEIGHTS.retention);
+            score += retentionBonus;
+            
+            if (retentionRate >= 80) {
+                reasons.push('Families rebook often');
+            } else if (retentionRate >= 60) {
+                reasons.push('Strong client relationships');
+            }
+        }
+
         // --- STEP 10: FEEDBACK HISTORY (Self-Learning) ---
         let historyPenalty = 0;
         const badTags = caregiver.personalityTags?.filter(tag => dislikedTags.has(tag)) || [];
@@ -304,27 +322,67 @@ export const matchService = {
 
         // --- STEP 11: SCORE NORMALIZATION & CAPPING (CRITICAL FIX) ---
         // Ensure score is between 0 and 100
-        const finalScore = Math.max(SCORE_CAPS.min, Math.min(Math.round(score), SCORE_CAPS.max));
+        let finalScore = Math.max(SCORE_CAPS.min, Math.min(Math.round(score), SCORE_CAPS.max));
 
-        // --- STEP 12: REASONING GENERATION ---
+        // --- STEP 12: PREDICTIVE SCORING INTEGRATION (NEW) ---
+        // Blend with AI-powered predictive factors if enabled
+        if (context?.requestedDate && context?.requestedTime) {
+            try {
+                // Use pre-calculated factors if available (batch optimization)
+                const predictiveFactors = preCalculatedFactors || await getPredictiveFactors(
+                    caregiver,
+                    seniorProfile,
+                    context.requestedDate,
+                    context.requestedTime
+                );
+
+                // Blend: 70% base score, 30% predictive
+                finalScore = Math.round(
+                    (finalScore * 0.7) + (predictiveFactors.successProbability * 0.3)
+                );
+
+                // Add predictive reasoning
+                if (predictiveFactors.similarSeniorsScore >= 75) {
+                    reasons.push(`Seniors like yours love this caregiver`);
+                }
+                if (predictiveFactors.retentionScore >= 80) {
+                    reasons.push(`${predictiveFactors.retentionScore}% client retention rate`);
+                }
+                if (predictiveFactors.acceptanceProbability >= 85) {
+                    reasons.push(`Likely to accept this shift`);
+                }
+
+                // Cap again after blending
+                finalScore = Math.max(SCORE_CAPS.min, Math.min(finalScore, SCORE_CAPS.max));
+
+            } catch (error) {
+                // Predictive scoring failed, continue with base score
+                console.warn('Predictive scoring failed:', error);
+            }
+        }
+
+        // --- STEP 13: REASONING GENERATION ---
         let reasoning = "";
+
+        // Build confidence indicator
+        const confidenceEmoji = finalScore >= 90 ? '🎯' : finalScore >= 75 ? '✓' : '⚠';
 
         if (finalScore >= SCORE_CAPS.excellent) {
             reasoning = reasons.length > 0 
-                ? `Excellent match! ${reasons[0]}`
-                : "Excellent overall match.";
+                ? `${confidenceEmoji} Excellent match! ${reasons[0]}`
+                : `${confidenceEmoji} Excellent overall match.`;
         } else if (finalScore >= SCORE_CAPS.good) {
             reasoning = reasons.length > 0
-                ? `Good match. ${reasons[0]}`
-                : "Good overall match.";
+                ? `${confidenceEmoji} Good match. ${reasons[0]}`
+                : `${confidenceEmoji} Good overall match.`;
         } else if (finalScore >= SCORE_CAPS.fair) {
             reasoning = reasons.length > 0
-                ? `Fair match. ${reasons[0]}`
-                : "Meets basic requirements.";
+                ? `${confidenceEmoji} Fair match. ${reasons[0]}`
+                : `${confidenceEmoji} Meets basic requirements.`;
         } else {
             reasoning = flags.length > 0
-                ? `Some concerns: ${flags[0]}`
-                : "Limited match.";
+                ? `⚠ Some concerns: ${flags[0]}`
+                : `⚠ Limited match.`;
         }
 
         // Add context for why not 100
@@ -369,6 +427,21 @@ export const matchService = {
             );
         }
 
+        // OPTIMIZATION: Batch predictive scoring for better performance
+        let predictiveFactorsMap: Map<string, any> | null = null;
+        if (context?.requestedDate && context?.requestedTime) {
+            try {
+                predictiveFactorsMap = await getBatchPredictiveFactors(
+                    caregivers.filter(c => !availabilityMap || availabilityMap.get(c.id)),
+                    seniorProfile,
+                    context.requestedDate,
+                    context.requestedTime
+                );
+            } catch (error) {
+                console.warn('[MatchService] Batch predictive scoring failed:', error);
+            }
+        }
+
         for (const caregiver of caregivers) {
             // Skip if not available
             if (availabilityMap && !availabilityMap.get(caregiver.id)) {
@@ -379,7 +452,8 @@ export const matchService = {
                 caregiver,
                 seniorProfile,
                 feedbackHistory,
-                context
+                context,
+                predictiveFactorsMap?.get(caregiver.id)
             );
 
             if (scored && scored.matchScore > 0) {
@@ -414,5 +488,45 @@ export const matchService = {
         );
 
         return scored.slice(0, topN);
+    },
+
+    /**
+     * Get predictive insights for a caregiver
+     * Use this to show Cara why a caregiver is a good match
+     */
+    getMatchInsights: async (
+        caregiver: Caregiver,
+        senior: Senior,
+        requestedDate?: Date,
+        requestedTime?: string
+    ): Promise<{
+        score: number;
+        reasoning: string;
+        confidence: 'high' | 'medium' | 'low';
+        insights: string[];
+    }> => {
+        const factors = await getPredictiveFactors(caregiver, senior, requestedDate, requestedTime);
+        
+        const insights: string[] = [];
+        
+        if (factors.similarSeniorsScore >= 75) {
+            insights.push(`Seniors similar to ${senior.name || 'your loved one'} have given ${caregiver.name} excellent reviews`);
+        }
+        if (factors.retentionScore >= 80) {
+            insights.push(`${factors.retentionScore}% of families continue booking ${caregiver.name} long-term`);
+        }
+        if (factors.acceptanceProbability >= 85) {
+            insights.push(`${caregiver.name} usually accepts shifts at this time`);
+        }
+        if (factors.successProbability >= 85) {
+            insights.push(`High confidence match based on historical data`);
+        }
+
+        return {
+            score: factors.successProbability,
+            reasoning: generatePredictiveReasoning(factors, caregiver.name || 'This caregiver'),
+            confidence: factors.confidence,
+            insights
+        };
     }
 };

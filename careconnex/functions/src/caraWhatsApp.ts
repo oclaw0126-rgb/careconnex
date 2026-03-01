@@ -4,6 +4,32 @@ import { runCaraAgent, loadUserMemory, loadConversationHistory } from './caraAge
 
 const db = admin.firestore();
 
+// SECURITY: Input sanitization helper to prevent XSS and injection attacks
+function sanitizeInput(input: string | undefined | null): string {
+  if (!input) return '';
+  
+  return input
+    .replace(/[<>]/g, '') // Remove < and > to prevent HTML/JS injection
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, '') // Remove event handlers (onclick, onerror, etc.)
+    .substring(0, 4000); // Limit length to prevent DoS
+}
+
+function sanitizePhoneNumber(phone: string): string {
+  // Only allow digits, +, and -
+  return phone.replace(/[^\d+\-]/g, '').substring(0, 20);
+}
+
+function sanitizeProfileName(name: string | undefined): string | null {
+  if (!name) return null;
+  // Remove control characters and limit length
+  return name
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/[<>]/g, '') // Remove HTML tags
+    .trim()
+    .substring(0, 100) || null; // Limit to 100 chars
+}
+
 /**
  * ============================================================
  * CARA WHATSAPP WEBHOOK v4.0 - OpenClaw Architecture
@@ -14,15 +40,22 @@ export const whatsappWebhook = functions.https.onRequest(async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Parse Twilio request
-    const { From, Body, ProfileName } = req.body;
+    // Parse and sanitize Twilio request inputs
+    const rawFrom = req.body?.From || '';
+    const rawBody = req.body?.Body || '';
+    const rawProfileName = req.body?.ProfileName;
 
-    console.log('📱 ========================================');
-    console.log('📱 WHATSAPP MESSAGE RECEIVED');
-    console.log('📱 From:', From);
-    console.log('📱 Body:', Body);
-    console.log('📱 Name:', ProfileName);
-    console.log('📱 ========================================');
+    // SECURITY: Sanitize all user inputs to prevent XSS and injection
+    const From = sanitizePhoneNumber(rawFrom);
+    const Body = sanitizeInput(rawBody);
+    const ProfileName = sanitizeProfileName(rawProfileName);
+
+    // Log sanitized inputs (never log raw body for privacy)
+    functions.logger.info('WhatsApp message received', {
+      from: From.substring(0, 10) + '...', // Partial phone for privacy
+      name: ProfileName,
+      bodyLength: Body.length
+    });
 
     // Extract phone
     const phoneNumber = From.replace('whatsapp:', '');
@@ -35,12 +68,13 @@ export const whatsappWebhook = functions.https.onRequest(async (req, res) => {
     const isNewUser = !userDoc.exists;
 
     if (isNewUser) {
-      console.log('👤 Creating new user');
+      functions.logger.info('Creating new user', { phoneNumber: phoneNumber.substring(0, 6) + '...' });
       await userRef.set({
         phoneNumber,
-        whatsappName: ProfileName || null,
+        whatsappName: ProfileName,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        messageCount: 0
+        messageCount: 0,
+        sanitizedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       userData = { phoneNumber, whatsappName: ProfileName };
     }
