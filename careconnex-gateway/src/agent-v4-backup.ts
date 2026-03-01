@@ -2,7 +2,7 @@
 // Reliable, accurate, and always responsive
 
 import { CARA_SOUL } from './config';
-import { callLLM } from './llm';
+import { callLLMString as callLLM } from './llm';
 import { executeTool } from './tools';
 import { Session, getOrCreateSession, addToHistory, updateMemory } from './session';
 import { AgentResult, ToolCall } from './types';

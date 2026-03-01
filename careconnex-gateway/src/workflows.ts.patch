@@ -1,0 +1,18 @@
+// Simple regex-based intent detection for workflows
+export function detectWorkflowIntent(userMessage: string): { workflowKey: string, inputs: Record<string, any> } | null {
+  const msg = userMessage.toLowerCase();
+  
+  if (msg.includes('need a caregiver') || msg.includes('looking for a caregiver') || msg.includes('find me a caregiver')) {
+    return { workflowKey: 'intake', inputs: {} };
+  }
+  
+  if (msg.includes('schedule an interview') || msg.includes('book an interview')) {
+    return { workflowKey: 'interview', inputs: {} };
+  }
+
+  if (msg.includes('leave a review') || msg.includes('rate caregiver')) {
+    return { workflowKey: 'review', inputs: {} };
+  }
+  
+  return null;
+}

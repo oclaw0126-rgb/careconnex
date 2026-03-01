@@ -2,7 +2,7 @@
 // Each sub-agent handles a specific domain
 
 import { logger } from './logger';
-import { callLLM } from './llm';
+import { callLLMString as callLLM } from './llm';
 import * as admin from 'firebase-admin';
 
 const db = new Proxy({}, { get: (_, prop) => (admin.firestore() as any)[prop] }) as FirebaseFirestore.Firestore;

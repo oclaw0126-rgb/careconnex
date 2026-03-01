@@ -2,7 +2,7 @@
 // Learns from successful/failed matches to improve recommendations over time
 
 import * as admin from 'firebase-admin';
-import { callLLM } from './llm';
+import { callLLMString as callLLM } from './llm';
 import { logger } from './logger';
 
 const db = new Proxy({}, { get: (_, prop) => (admin.firestore() as any)[prop] }) as FirebaseFirestore.Firestore;

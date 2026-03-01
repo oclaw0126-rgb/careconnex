@@ -4,12 +4,13 @@
 import express from 'express';
 import * as admin from 'firebase-admin';
 import { logger } from './logger';
-import { runAgent } from './agent';
+import { Agent, runAgent } from './agent';
 import { initializeTools } from './tools';
 import { getSessionStats } from './session';
 import { spawnSubAgent, runOvernightJobs } from './subagents';
 import { analyzeSeniorHealth, runHealthAnalysisForAllSeniors, sendDailyHealthSummary } from './healthPredictor';
 import { getSmartMatches, calculateSmartMatchScore, collectFamilyFeedback, learnFromMatches, runWeeklyLearning } from './matchingLearner';
+import { startHeartbeatScheduler, runHeartbeat } from './heartbeat';
 
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
@@ -60,33 +61,18 @@ app.get('/health', (req, res) => {
 
 // WhatsApp webhook endpoint (Twilio)
 app.post('/webhook/whatsapp', async (req, res) => {
-  const startTime = Date.now();
-  
   try {
     const { From, Body, ProfileName } = req.body;
-    
-    logger.info('[Webhook] Received message', {
-      from: From,
-      body: Body,
-      name: ProfileName
-    });
-    
-    // Extract phone number
     const phoneNumber = From?.replace('whatsapp:', '') || '';
     
     if (!phoneNumber || !Body) {
-      logger.warn('[Webhook] Invalid request', { body: req.body });
       res.status(400).send('Invalid request');
       return;
     }
     
-    // Run the agent
-    const result = await runAgent(Body, phoneNumber, ProfileName);
-    
-    logger.info('[Webhook] Agent response', {
-      response: result.response.substring(0, 100),
-      toolCalls: result.toolCalls.length
-    });
+    // Use new Agent class
+    const agent = new Agent(phoneNumber, `session_${Date.now()}`);
+    const result = await agent.processMessage(Body);
     
     // Send TwiML response
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -97,16 +83,12 @@ app.post('/webhook/whatsapp', async (req, res) => {
     res.set('Content-Type', 'text/xml');
     res.send(twiml);
     
-    const duration = Date.now() - startTime;
-    logger.info('[Webhook] Completed', { duration: `${duration}ms` });
-    
   } catch (error) {
-    logger.error('[Webhook] Error', { error });
-    
+    logger.error('[Webhook] Error', error);
     res.set('Content-Type', 'text/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>I apologize, I'm having a moment. Please try again!</Message>
+  <Message>I apologize, I'm having trouble right now. Please try again!</Message>
 </Response>`);
   }
 });
@@ -391,6 +373,17 @@ function escapeXml(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
+// ========== ADMIN ENDPOINTS ==========
+
+// Manual trigger for heartbeat
+app.post('/admin/heartbeat', async (req, res) => {
+  await runHeartbeat();
+  res.json({ success: true, message: 'Heartbeat executed' });
+});
+
+// Auto-start proactive heartbeat
+startHeartbeatScheduler();
 
 // Start server
 app.listen(PORT, () => {
