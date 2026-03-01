@@ -14,12 +14,26 @@ import { startHeartbeatScheduler, runHeartbeat } from './heartbeat';
 
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
 if (firebaseProjectId) {
-  admin.initializeApp({
-    projectId: firebaseProjectId,
-    credential: admin.credential.applicationDefault()
-  });
-  logger.info('[Firebase] Initialized', { projectId: firebaseProjectId });
+  if (clientEmail && privateKey) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: firebaseProjectId,
+        clientEmail,
+        privateKey
+      })
+    });
+    logger.info('[Firebase] Initialized with cert', { projectId: firebaseProjectId });
+  } else {
+    admin.initializeApp({
+      projectId: firebaseProjectId,
+      credential: admin.credential.applicationDefault()
+    });
+    logger.info('[Firebase] Initialized with Application Default', { projectId: firebaseProjectId });
+  }
 } else {
   logger.warn('[Firebase] No project ID configured');
 }
