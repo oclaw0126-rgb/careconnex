@@ -2,11 +2,11 @@ import * as admin from 'firebase-admin';
 import { logger } from './logger';
 import { sendProactiveMessage } from './messaging';
 
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 // Helper to determine if we should message (don't spam if contacted < 48h ago)
 async function shouldMessageUser(userId: string): Promise<boolean> {
-  const userDoc = await db.collection('users').doc(userId).get();
+  const userDoc = await getDb().collection('users').doc(userId).get();
   if (!userDoc.exists) return true;
   
   const data = userDoc.data();
@@ -31,7 +31,7 @@ export const heartbeatChecks = {
     
     // Simplification: query users who recently searched but haven't booked an interview.
     // In a production environment, this would likely be more sophisticated.
-    const recentSearches = await db.collection('search_logs')
+    const recentSearches = await getDb().collection('search_logs')
       .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(sevenDaysAgo))
       .get();
       
@@ -42,14 +42,14 @@ export const heartbeatChecks = {
       if (!userId || checkedUsers.has(userId)) continue;
       checkedUsers.add(userId);
       
-      const interviews = await db.collection('interviews')
+      const interviews = await getDb().collection('interviews')
         .where('familyId', '==', userId)
         .limit(1)
         .get();
         
       if (interviews.empty) {
         if (await shouldMessageUser(userId)) {
-          const userDoc = await db.collection('users').doc(userId).get();
+          const userDoc = await getDb().collection('users').doc(userId).get();
           const phone = userDoc.data()?.phone;
           if (phone) {
             await sendProactiveMessage(
@@ -66,7 +66,7 @@ export const heartbeatChecks = {
   // Check 2: Incomplete caregiver profiles
   incompleteCaregivers: async () => {
     logger.info('[Heartbeat] Checking incomplete caregivers...');
-    const caregivers = await db.collection('caregivers')
+    const caregivers = await getDb().collection('caregivers')
       .where('status', '==', 'incomplete')
       .get();
       
@@ -92,7 +92,7 @@ export const heartbeatChecks = {
     fortyEightHoursAgo.setHours(fortyEightHoursAgo.getHours() - 48);
     
     // We assume there's a status='scheduled' and followUpSent wasn't set to true yet
-    const overdue = await db.collection('interviews')
+    const overdue = await getDb().collection('interviews')
       .where('scheduledAt', '<=', admin.firestore.Timestamp.fromDate(fortyEightHoursAgo))
       .where('status', '==', 'scheduled')
       .get();
@@ -103,7 +103,7 @@ export const heartbeatChecks = {
       
       const familyId = interview.familyId;
       if (familyId && await shouldMessageUser(familyId)) {
-        const userDoc = await db.collection('users').doc(familyId).get();
+        const userDoc = await getDb().collection('users').doc(familyId).get();
         const phone = userDoc.data()?.phone;
         if (phone) {
           const caregiverName = interview.caregiverName || 'the caregiver';
@@ -126,7 +126,7 @@ export const heartbeatChecks = {
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     
     // Assuming lastActivityAt is tracked on the user document
-    const inactive = await db.collection('users')
+    const inactive = await getDb().collection('users')
       .where('lastActivityAt', '<=', admin.firestore.Timestamp.fromDate(fourteenDaysAgo))
       .where('status', '==', 'active')
       .get();
@@ -151,7 +151,7 @@ export const heartbeatChecks = {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const placements = await db.collection('placements')
+    const placements = await getDb().collection('placements')
       .where('status', '==', 'active')
       .where('lastCheckInAt', '<=', admin.firestore.Timestamp.fromDate(sevenDaysAgo))
       .get();
@@ -161,7 +161,7 @@ export const heartbeatChecks = {
       const cgId = placement.caregiverId;
       
       if (cgId && await shouldMessageUser(cgId)) {
-        const cgDoc = await db.collection('caregivers').doc(cgId).get();
+        const cgDoc = await getDb().collection('caregivers').doc(cgId).get();
         const phone = cgDoc.data()?.phone;
         if (phone) {
           const familyName = placement.familyName || 'family';

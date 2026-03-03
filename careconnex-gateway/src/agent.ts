@@ -5,7 +5,7 @@ import { startWorkflow, detectWorkflowIntent } from './workflows';
 import { logger } from './logger';
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 export interface AgentResult {
   response: string;

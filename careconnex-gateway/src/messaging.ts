@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { logger } from './logger';
 import twilio from 'twilio';
 
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 export async function sendProactiveMessage(
   to: string, 
@@ -26,7 +26,7 @@ export async function sendProactiveMessage(
     }
 
     // Log to Firestore for tracking
-    await db.collection('proactive_messages').add({
+    await getDb().collection('proactive_messages').add({
       userId: context.userId,
       checkType: context.checkType,
       message,
@@ -36,7 +36,7 @@ export async function sendProactiveMessage(
     });
     
     // Update last contacted time for the user to prevent spam
-    await db.collection('users').doc(context.userId).set({
+    await getDb().collection('users').doc(context.userId).set({
       lastContactedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 

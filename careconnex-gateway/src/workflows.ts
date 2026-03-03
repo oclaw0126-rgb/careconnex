@@ -5,7 +5,8 @@ import { logger } from './logger';
 import { executeTool } from './tools/registry';
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
+// Lazy initialization of Firestore to ensure Firebase is initialized first
+const getDb = () => admin.firestore();
 
 // Workflow step types
 export type StepType = 
@@ -177,7 +178,7 @@ export class WorkflowEngine {
       throw new Error(`Unknown workflow: ${workflowKey}`);
     }
     
-    const workflowId = db.collection('workflows').doc().id;
+    const workflowId = getDb().collection('workflows').doc().id;
     
     const context: WorkflowContext = {
       workflowId,
@@ -191,7 +192,7 @@ export class WorkflowEngine {
     };
     
     // Save to Firestore
-    await db.collection('workflows').doc(workflowId).set({
+    await getDb().collection('workflows').doc(workflowId).set({
       ...context,
       startedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -291,7 +292,7 @@ export class WorkflowEngine {
   }
   
   private async saveWorkflow(context: WorkflowContext): Promise<void> {
-    await db.collection('workflows').doc(context.workflowId).update({
+    await getDb().collection('workflows').doc(context.workflowId).update({
       currentStep: context.currentStep,
       results: context.results,
       status: context.status,
@@ -311,7 +312,7 @@ export class WorkflowEngine {
   }
   
   async resumeWorkflow(workflowId: string, userInput: any): Promise<void> {
-    const doc = await db.collection('workflows').doc(workflowId).get();
+    const doc = await getDb().collection('workflows').doc(workflowId).get();
     if (!doc.exists) {
       throw new Error(`Workflow not found: ${workflowId}`);
     }
