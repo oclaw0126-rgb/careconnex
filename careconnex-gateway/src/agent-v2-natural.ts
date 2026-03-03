@@ -1,5 +1,6 @@
 // Cara AI - Natural Conversation Agent
 // Redesigned to have natural conversations first, use tools only when needed
+// Build: 2026-03-02-v2
 
 import { CARA_SOUL } from './config';
 import { callLLMString as callLLM } from './llm';
