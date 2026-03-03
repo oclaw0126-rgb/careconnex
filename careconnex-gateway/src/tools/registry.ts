@@ -105,7 +105,20 @@ registerTool({
   parameters: {
     type: 'object',
     properties: {
-      caregivers: { type: 'array', description: 'List of caregivers to rank' },
+      caregivers: { 
+        type: 'array', 
+        description: 'List of caregivers to rank',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            yearsExperience: { type: 'number' },
+            rating: { type: 'number' },
+            hourlyRate: { type: 'number' }
+          }
+        }
+      },
       criteria: { type: 'string', enum: ['experience', 'rating', 'hourlyRate'] },
       limit: { type: 'number', default: 3 }
     },
