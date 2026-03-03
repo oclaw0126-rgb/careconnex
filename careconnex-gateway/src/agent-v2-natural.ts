@@ -25,21 +25,11 @@ export async function runAgent(
   userPhone: string,
   userName?: string
 ): Promise<AgentResult> {
-  
+  // CACHE BUST: Build 2026-03-02-v3
   logger.info('[Cara] Processing message', { userPhone, message: userMessage });
   
-  // Initialize session outside try to ensure it's available in catch
-  let session: Session;
-  try {
-    session = getOrCreateSession(userPhone, userName);
-  } catch (initError) {
-    logger.error('[Cara] Failed to initialize session:', initError);
-    return {
-      response: "I'm having trouble starting our conversation. Can you try again in a moment?",
-      toolCalls: [],
-      updatedMemory: {}
-    };
-  }
+  // Get or create session - initialized immediately
+  const session = getOrCreateSession(userPhone, userName);
   
   try {
     // STEP 1: Have a natural conversation first
@@ -127,7 +117,7 @@ Think of yourself as a helpful friend who happens to know about senior care.`
     return {
       response: "I'm so sorry, I'm having a moment. Can you tell me again what you're looking for? I want to make sure I help you find the perfect care for your loved one.",
       toolCalls: [],
-      updatedMemory: session.memory
+      updatedMemory: (session as any)?.memory || {}
     };
   }
 }
