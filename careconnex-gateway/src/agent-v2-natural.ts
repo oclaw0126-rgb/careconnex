@@ -27,9 +27,10 @@ export async function runAgent(
   
   logger.info('[Cara] Processing message', { userPhone, message: userMessage });
   
-  const session = getOrCreateSession(userPhone, userName);
+  let session: Session;
   
   try {
+    session = getOrCreateSession(userPhone, userName);
     // STEP 1: Have a natural conversation first
     // Build conversation context
     const conversationContext = buildConversationContext(session);
@@ -115,7 +116,7 @@ Think of yourself as a helpful friend who happens to know about senior care.`
     return {
       response: "I'm so sorry, I'm having a moment. Can you tell me again what you're looking for? I want to make sure I help you find the perfect care for your loved one.",
       toolCalls: [],
-      updatedMemory: session.memory
+      updatedMemory: session?.memory || {}
     };
   }
 }

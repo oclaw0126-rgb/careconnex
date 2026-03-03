@@ -322,7 +322,7 @@ export async function toolSendSMS(
     // Use Twilio API to send SMS
     const postData = new URLSearchParams({
       To: params.to,
-      From: TWILIO_NUMBER,
+      From: TWILIO_NUMBER!,
       Body: params.message
     }).toString();
     

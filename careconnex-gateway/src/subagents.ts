@@ -94,7 +94,7 @@ async function executeSubAgent(
     await db.collection('subagent_tasks').doc(taskId).update({
       status: 'failed',
       completedAt: new Date(),
-      result: { error: (error as Error).message }
+      result: { error: error instanceof Error ? error.message : String(error) }
     });
   }
 }
