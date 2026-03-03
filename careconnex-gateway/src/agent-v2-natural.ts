@@ -28,7 +28,7 @@ export async function runAgent(
   
   logger.info('[Cara] Processing message', { userPhone, message: userMessage });
   
-  let session: Session;
+  let session!: Session;
   
   try {
     session = getOrCreateSession(userPhone, userName);
