@@ -28,10 +28,20 @@ export async function runAgent(
   
   logger.info('[Cara] Processing message', { userPhone, message: userMessage });
   
-  let session!: Session;
-  
+  // Initialize session outside try to ensure it's available in catch
+  let session: Session;
   try {
     session = getOrCreateSession(userPhone, userName);
+  } catch (initError) {
+    logger.error('[Cara] Failed to initialize session:', initError);
+    return {
+      response: "I'm having trouble starting our conversation. Can you try again in a moment?",
+      toolCalls: [],
+      updatedMemory: {}
+    };
+  }
+  
+  try {
     // STEP 1: Have a natural conversation first
     // Build conversation context
     const conversationContext = buildConversationContext(session);
@@ -117,7 +127,7 @@ Think of yourself as a helpful friend who happens to know about senior care.`
     return {
       response: "I'm so sorry, I'm having a moment. Can you tell me again what you're looking for? I want to make sure I help you find the perfect care for your loved one.",
       toolCalls: [],
-      updatedMemory: session?.memory || {}
+      updatedMemory: session.memory
     };
   }
 }
