@@ -18,11 +18,11 @@ export class MemoryManager {
     if (!db) return [];
     const snapshot = await db.collection('messages')
       .where('userId', '==', userId)
-      .orderBy('timestamp', 'asc')
+      .orderBy('timestamp', 'desc')
       .limit(limit)
       .get();
       
-    return snapshot.docs.map(doc => doc.data().message as ConversationMessage);
+    return snapshot.docs.reverse().map(doc => doc.data().message as ConversationMessage);
   }
 
   async saveMessage(userId: string, sessionId: string, message: ConversationMessage): Promise<void> {
